@@ -21,12 +21,14 @@ DEPENDENCIES = ("bash, python3 (>= 3.11), libc6-i386 (>= 2.41), innoextract (>= 
                 "pkexec, sudo, dbus-user-session, coreutils, desktop-file-utils, util-linux")
 LAUNCH = '''#!/bin/bash
 set -euo pipefail
-root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+self=$(readlink -f -- "${BASH_SOURCE[0]}")
+root=$(cd -- "$(dirname -- "$self")/.." && pwd -P)
 exec /usr/bin/python3 -I "$root/package_install.py" -- "$@"
 '''
 SETUP = '''#!/bin/bash
 set -euo pipefail
-root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+self=$(readlink -f -- "${BASH_SOURCE[0]}")
+root=$(cd -- "$(dirname -- "$self")/.." && pwd -P)
 exec /usr/bin/python3 -I "$root/package_install.py" "$@"
 '''
 ICON = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect x="8" y="8" width="112" height="112" rx="26" fill="#1673c9"/><path d="M32 40h64v42H62L43 98V82H32z" fill="none" stroke="white" stroke-width="7" stroke-linejoin="round"/><circle cx="48" cy="61" r="4" fill="white"/><circle cx="64" cy="61" r="4" fill="white"/><circle cx="80" cy="61" r="4" fill="white"/></svg>

@@ -8,8 +8,10 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+import subprocess
 
 import seed
+import build_deb
 
 
 class SeedTests(unittest.TestCase):
@@ -107,6 +109,39 @@ class SeedTests(unittest.TestCase):
         (installed / "resources/app/native/launch-welink").chmod(0o644)
         with self.assertRaisesRegex(ValueError, "permissions differ"):
             seed.verify(installed, manifest, namespace_sandbox=True)
+
+
+    def test_symlinked_public_commands_preserve_first_run_consent(self):
+        self.package()
+        sources = Path(__file__).resolve().parent
+        for name in ("seed.py", "package_install.py", "sandbox_helper.py"):
+            shutil.copyfile(sources / name, self.output / name)
+        tools = self.output / "tools"
+        tools.mkdir()
+        for name in ("acquire.py", "acquire_image_inputs.py", "delta.py", "install_desktop.py",
+                     "image-inputs.lock.json", "custom-background.integrity.json"):
+            shutil.copyfile(seed.TOOLS / name, tools / name)
+        self.put(self.output / "bin/launch", build_deb.LAUNCH.encode(), 0o755)
+        self.put(self.output / "bin/setup", build_deb.SETUP.encode(), 0o755)
+        aliases = self.root / "command aliases"
+        aliases.mkdir()
+        for name in ("launch", "setup"):
+            (aliases / name).symlink_to(self.output / "bin" / name)
+        home = self.root / "desktop user home"
+        home.mkdir(mode=0o700)
+        environment = {"HOME": str(home), "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+        for name in ("launch", "setup"):
+            result = subprocess.run([str(aliases / name)], env=environment,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("sudo" if os.geteuid() == 0 else "--accept-vendor-terms", result.stderr)
+            self.assertFalse((home / ".local/share/hit-welink-native/profile").exists())
+            self.assertFalse((home / ".cache/hit-welink-native/archives").exists())
+        help_result = subprocess.run([str(aliases / "setup"), "--help"], env=environment,
+                                     capture_output=True, text=True, timeout=10)
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("--vendor-installer", help_result.stdout)
+        self.assertIn("--no-launch", help_result.stdout)
 
 
 if __name__ == "__main__":
