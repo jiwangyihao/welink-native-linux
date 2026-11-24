@@ -214,17 +214,19 @@ async function initApp({ calcTimeMap }) {
   const events = win.constant.UT_EVENT_NAME;
   const time = new Date(now);
   const stop = [time.getHours(), time.getMinutes(), time.getSeconds()].map(value => String(value).padStart(2, '0')).join(':') + '.' + String(time.getMilliseconds()).padStart(3, '0');
-  await win.Pedestal.callMethod('method://hwaUt/addHwaUtData', {
+  // Telemetry may wait for account data; it must not gate first-login privacy.
+  // Match the vendor notification contract while keeping failures observable.
+  win.Pedestal.callMethod('method://hwaUt/addHwaUtData', {
     eventId: win.isRedblue ? events.appLaunch_red : events.appLaunch,
     eventDesc: '启动应用', newUtDataRedblue: win.isRedblue,
     args: { use_time: now - calcTimeMap.startTime, start_time: calcTimeMap.startLoadModule, stop_time: stop,
       start_load_module: calcTimeMap.startLoadModule, start_load_common: calcTimeMap.startLoadCommon,
       start_load_appservice: calcTimeMap.startLoadAppService, start_load_account: calcTimeMap.startLoadAccount,
       start_load_ui: calcTimeMap.startLoadUi }
-  });
-  await win.Pedestal.callMethod('method://hwaUt/addHwaUtData', {
+  }).catch(report);
+  win.Pedestal.callMethod('method://hwaUt/addHwaUtData', {
     eventId: events.lifecycle, args: { errorMessage: '', isCrash: 0, isLauncher: 1 }
-  });
+  }).catch(report);
   return 0;
 }
 async function resolveIpConfigInfo() {
