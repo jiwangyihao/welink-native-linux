@@ -16,7 +16,7 @@ function descriptor(item, asset) {
   if (!item || item.asset !== asset || !Number.isSafeInteger(item.size) || item.size <= 0 ||
       item.size > config.maxInstallerBytes || !HASH.test(item.sha256 || '')) invalid('Invalid signed asset descriptor: ' + asset);
 }
-function verifyManifest(bytes, signature, publicKey, { version, current, checkerSha256 }) {
+function verifyManifest(bytes, signature, publicKey, { version, current, checkerSha256, allowCurrent = false }) {
   const encoded = signature.toString('ascii').trim();
   if (!/^[A-Za-z0-9+/]{86}==$/.test(encoded)) throw failure('ESIGNATURE', 'Invalid Ed25519 signature encoding.');
   const key = crypto.createPublicKey(publicKey);
@@ -27,7 +27,7 @@ function verifyManifest(bytes, signature, publicKey, { version, current, checker
   catch (_) { invalid('The signed update manifest is not UTF-8 JSON.'); }
   if (!manifest || manifest.format !== 1 || revision(version) === null || manifest.version !== version ||
       manifest.build !== 'hit-native-linux-ia32-' + version || !/^[a-f0-9]{40}$/.test(manifest.sourceCommit || '') ||
-      revision(version) <= revision(current.version)) invalid('The signed update identity is invalid or not newer than this application.');
+      revision(current.version) === null || !allowCurrent && revision(version) <= revision(current.version)) invalid('The signed update identity is invalid or not newer than this application.');
   if (!Array.isArray(manifest.installers) || !manifest.installers.length || manifest.installers.length > 100)
     invalid('The signed installer list is invalid.');
   const bases = new Set(), assets = new Set();
@@ -40,6 +40,9 @@ function verifyManifest(bytes, signature, publicKey, { version, current, checker
     bases.add(item.base); assets.add(item.asset);
   }
   descriptor(manifest.integration, 'install_desktop.py');
+  if (manifest.name !== undefined && (typeof manifest.name !== 'string' || manifest.name.length > 200) ||
+      manifest.notes !== undefined && (typeof manifest.notes !== 'string' || manifest.notes.length > 64000)) invalid('Invalid signed release presentation.');
+  if (revision(version) <= revision(current.version)) return { manifest, installer: null };
   const installer = manifest.installers.find(item => item.base === current.build && item.baseCheckerSha256 === checkerSha256);
   if (!installer) throw failure('EBASE', 'This signed release has no installer for the exact installed image. Keep this version; no files were changed.');
   return { manifest, installer };
@@ -51,9 +54,11 @@ function assetUrl(version, asset) {
 function redirectUrl(value, initial) {
   let url;
   try { url = new URL(value); } catch (_) { invalid('Invalid release asset redirect.'); }
+  const latestRedirect = initial === config.channelManifest &&
+    /^\/jiwangyihao\/welink-native-linux\/releases\/download\/r45\.(?:0|[1-9][0-9]*)\/native-update\.json$/.test(url.pathname) && !url.search;
   if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash ||
       !['github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'].includes(url.hostname) ||
-      url.hostname === 'github.com' && value !== initial) invalid('The release asset redirected outside the allowed GitHub HTTPS hosts.');
+      url.hostname === 'github.com' && value !== initial && !latestRedirect) invalid('The release asset redirected outside the allowed GitHub HTTPS hosts.');
   return url.href;
 }
 module.exports = { verifyManifest, revision, assetUrl, redirectUrl };

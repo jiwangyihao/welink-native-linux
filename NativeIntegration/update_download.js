@@ -8,13 +8,13 @@ const { failure } = require('./platform_settings');
 
 // No business headers, cookies, credential callbacks or certificate exceptions.
 // The file sink is exclusive and bounded; executable bytes never enter renderer IPC.
-function download({ net, session, url, signal, filename, size, sha256, limit, progress = () => {} }) {
+function download({ net, session, url, signal, filename, size, sha256, limit, timeoutMs, progress = () => {} }) {
   return new Promise((resolve, reject) => {
     let request, fd, created = false, settled = false, ended = false, count = 0, redirects = 0;
     const chunks = [], hash = crypto.createHash('sha256');
     const maximum = size || limit;
     const timer = setTimeout(() => finish(failure('ETIMEDOUT', 'The GitHub release asset download timed out.')),
-      filename ? config.downloadTimeoutMs : config.timeoutMs);
+      timeoutMs || (filename ? config.downloadTimeoutMs : config.timeoutMs));
     function finish(error) {
       if (settled) return;
       settled = true; clearTimeout(timer);
@@ -35,6 +35,7 @@ function download({ net, session, url, signal, filename, size, sha256, limit, pr
       request = net.request({ method: 'GET', url, session, redirect: 'manual', credentials: 'omit', useSessionCookies: false });
       request.setHeader('Accept', 'application/octet-stream');
       request.setHeader('User-Agent', 'welink-native-linux-signed-update');
+      if (!filename) request.setHeader('Cache-Control', 'no-cache');
       request.on('redirect', (_code, method, next) => {
         try {
           if (++redirects > config.maxRedirects || method !== 'GET') throw failure('EPROTO', 'Too many release asset redirects.');

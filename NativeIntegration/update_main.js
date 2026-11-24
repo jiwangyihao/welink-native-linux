@@ -4,16 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./update_config');
 const crypto = require('crypto');
-const { verifyManifest, assetUrl } = require('./update_manifest');
+const { TextDecoder } = require('util');
+const { verifyManifest, assetUrl, revision } = require('./update_manifest');
 const { download } = require('./update_download');
 const { installUpdate } = require('./update_install');
 const { failure } = require('./platform_settings');
 
-function revision(tag) {
-  if (typeof tag !== 'string' || !/^r45\.(?:0|[1-9][0-9]*)$/.test(tag)) return null;
-  const value = Number(tag.slice(4));
-  return Number.isSafeInteger(value) ? value : null;
-}
 
 function releaseUrl(value, version) {
   // Exact equality also rejects credentials, ports, fragments, queries,
@@ -35,140 +31,37 @@ function readBuild(appRoot) {
   return { build: metadata.build, version: match[1] };
 }
 
-function header(response, name) {
-  const value = response.headers && response.headers[name];
-  return Array.isArray(value) ? value.join(', ') : String(value || '');
-}
-
-function requestPage(net, session, page, remaining, deadline, signal) {
-  return new Promise((resolve, reject) => {
-    let request, settled = false, ended = false, size = 0;
-    const chunks = [];
-    const timer = setTimeout(() => finish(failure('ETIMEDOUT', 'The native update check timed out.')), Math.max(1, deadline - Date.now()));
-    function finish(error, value) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener('abort', cancel);
-      if (error) {
-        reject(error);
-        if (request) request.abort();
-      } else resolve(value);
-    }
-    function cancel() { finish(failure('ECANCELED', 'The native update check was canceled.')); }
-    if (signal && signal.aborted) { cancel(); return; }
-    if (signal) signal.addEventListener('abort', cancel, { once: true });
-    try {
-      // Electron 22 has net.request, not net.fetch. Chromium's network stack
-      // retains the owner's session proxy and normal HTTPS certificate checks.
-      // Never install certificate exceptions or follow API redirects.
-      request = net.request({ method: 'GET', url: config.api + '?per_page=' + config.pageSize + '&page=' + page,
-        session, redirect: 'error', credentials: 'omit', useSessionCookies: false });
-      request.setHeader('Accept', 'application/vnd.github+json');
-      request.setHeader('X-GitHub-Api-Version', '2022-11-28');
-      request.setHeader('User-Agent', 'welink-native-linux-update-check');
-      request.on('error', error => finish(failure('ENETWORK', 'GitHub HTTPS request failed: ' + error.message)));
-      request.on('abort', () => finish(failure('ECANCELED', 'The native update request was aborted.')));
-      request.on('redirect', () => finish(failure('EPROTO', 'GitHub redirected the native releases API; the redirect was not followed.')));
-      request.on('login', (_info, callback) => {
-        callback();
-        finish(failure('EPROXYAUTH', 'The configured proxy requires authentication for the native update check.'));
-      });
-      request.on('response', response => {
-        const status = response.statusCode;
-        const retry = header(response, 'retry-after');
-        if (status === 429 || status === 403 && (header(response, 'x-ratelimit-remaining') === '0' || retry)) {
-          finish(failure('ERATELIMIT', 'GitHub has rate-limited update checks.' + (/^[0-9]+$/.test(retry) ? ' Try again after ' + retry + ' seconds.' : ' Try again later.')));
-          return;
-        }
-        if (status !== 200) {
-          finish(failure('EHTTP', 'GitHub releases API returned HTTP ' + status + (status === 403 ? ' (access denied or rate-limited).' : '.')));
-          return;
-        }
-        if (!/^application\/(?:json|vnd\.github\+json)(?:\s*;|$)/i.test(header(response, 'content-type'))) {
-          finish(failure('EPROTO', 'GitHub returned a non-JSON releases response.'));
-          return;
-        }
-        const length = header(response, 'content-length');
-        if (/^[0-9]+$/.test(length) && Number(length) > remaining) {
-          finish(failure('E2BIG', 'The native releases response exceeds the size limit.'));
-          return;
-        }
-        response.on('data', chunk => {
-          if (settled) return;
-          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          size += bytes.length;
-          if (size > remaining) { finish(failure('E2BIG', 'The native releases response exceeds the size limit.')); return; }
-          chunks.push(bytes);
-        });
-        response.on('error', error => finish(failure('ENETWORK', 'GitHub response failed: ' + error.message)));
-        response.on('aborted', () => finish(failure('ENETWORK', 'GitHub closed an incomplete releases response.')));
-        response.on('close', () => { if (!ended) finish(failure('ENETWORK', 'GitHub closed an incomplete releases response.')); });
-        response.on('end', () => {
-          ended = true;
-          if (settled) return;
-          let items;
-          try { items = JSON.parse(Buffer.concat(chunks, size).toString('utf8')); }
-          catch (_) { finish(failure('EPROTO', 'GitHub returned malformed releases JSON.')); return; }
-          if (!Array.isArray(items) || items.length > config.pageSize) {
-            finish(failure('EPROTO', 'GitHub returned an invalid releases list.'));
-            return;
-          }
-          // Pagination is not a retry. Only the fixed repository endpoint is
-          // requested; a server-supplied Link URL is never a request target.
-          const next = /(?:^|,)\s*<[^>]+>\s*;\s*rel="next"(?:\s*;[^,]*)?(?:,|$)/.test(header(response, 'link'));
-          finish(null, { items, next, bytes: size });
-        });
-      });
-      request.end();
-    } catch (error) { finish(error); }
-  });
-}
-
-function candidate(item) {
-  if (!item || typeof item !== 'object' || Array.isArray(item) || typeof item.tag_name !== 'string') {
-    throw failure('EPROTO', 'GitHub returned a malformed release or release tag.');
-  }
-  if (item.draft === true || item.prerelease === true || revision(item.tag_name) === null) return null;
-  if (item.draft !== false || item.prerelease !== false ||
-      item.body !== null && typeof item.body !== 'string' || item.name !== null && typeof item.name !== 'string') {
-    throw failure('EPROTO', 'GitHub returned malformed native release metadata.');
-  }
-  return { version: item.tag_name, url: releaseUrl(item.html_url, item.tag_name), name: item.name || item.tag_name, notes: item.body || '' };
-}
 
 function createNativeUpdater({ electron, appRoot }) {
   let verified = null;
   async function check({ session, signal }) {
+    verified = null;
     const current = readBuild(appRoot);
     const deadline = Date.now() + config.timeoutMs;
-    let latest = null, remaining = config.maxBytes;
-    for (let page = 1; page <= config.maxPages; page++) {
-      if (Date.now() >= deadline) throw failure('ETIMEDOUT', 'The native update check timed out.');
-      const response = await requestPage(electron.net, session, page, remaining, deadline, signal);
-      remaining -= response.bytes;
-      for (const item of response.items) {
-        const release = candidate(item);
-        if (release && (!latest || revision(release.version) > revision(latest.version))) latest = release;
-      }
-      if (!response.next) {
-        const result = { current, latest, status: latest ?
-          (revision(latest.version) > revision(current.version) ? 'available' : 'current') : 'no-releases' };
-        if (result.status === 'available') {
-          const bytes = await download({ net: electron.net, session, signal,
-            url: assetUrl(latest.version, 'native-update.json'), limit: config.maxManifestBytes });
-          const signature = await download({ net: electron.net, session, signal,
-            url: assetUrl(latest.version, 'native-update.sig'), limit: 512 });
-          const key = fs.readFileSync(path.join(appRoot, 'native/update_public_key.pem'));
-          const checkerSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
-          verifyManifest(bytes, signature, key, { version: latest.version, current, checkerSha256 });
-          verified = { bytes, signature, version: latest.version, current };
-          result.signed = true;
-        }
-        return result;
-      }
-    }
-    throw failure('E2BIG', 'The native releases list exceeds the page limit; its latest version could not be determined.');
+    const fetchMetadata = (url, limit) => {
+      const timeoutMs = deadline - Date.now();
+      if (timeoutMs <= 0) throw failure('ETIMEDOUT', 'The native update check timed out.');
+      return download({ net: electron.net, session, signal, url, limit, timeoutMs });
+    };
+    // Ordinary checks use static release assets, not the rate-limited REST API.
+    // The untrusted discovery body supplies only a constrained native tag;
+    // canonical tag bytes and their publisher signature remain mandatory.
+    const discovery = await fetchMetadata(config.channelManifest, config.maxManifestBytes);
+    let version;
+    try { version = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(discovery)).version; }
+    catch (_) { throw failure('EPROTO', 'The native update channel returned invalid JSON.'); }
+    if (revision(version) === null) throw failure('EPROTO', 'The native update channel returned an invalid native tag.');
+    const bytes = await fetchMetadata(assetUrl(version, 'native-update.json'), config.maxManifestBytes);
+    if (!bytes.equals(discovery)) throw failure('EPROTO', 'The native update channel and canonical release manifest differ.');
+    const signature = await fetchMetadata(assetUrl(version, 'native-update.sig'), 512);
+    const key = fs.readFileSync(path.join(appRoot, 'native/update_public_key.pem'));
+    const checkerSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
+    const checked = verifyManifest(bytes, signature, key, { version, current, checkerSha256, allowCurrent: true });
+    const latest = { version, url: releaseUrl(config.releasePage + version, version),
+      name: checked.manifest.name || 'Native Linux ' + version, notes: checked.manifest.notes || '' };
+    const status = revision(version) > revision(current.version) ? 'available' : 'current';
+    if (status === 'available') verified = { bytes, signature, version, current };
+    return { current, latest, status, signed: true };
   }
 
   async function present({ check: performCheck, window, assertActive, locale, session, registerCancel }) {
@@ -187,8 +80,7 @@ function createNativeUpdater({ electron, appRoot }) {
       const detail = current + '\n\n' + policy + (latest ? '\n\n' + (zh ? '已发布原生版本：' : 'Published native version: ') + latest.version + '\n' + latest.name + '\n\n' +
         preview + (preview.length < notes.length ? (zh ? '\n（完整说明请查看发布页面。）' : '\n(See the release page for the complete notes.)') : '') : '');
       const message = result.status === 'available' ? (zh ? '发现新的原生 Linux 版本' : 'A native Linux update is available') :
-        result.status === 'current' ? (zh ? '没有比当前版本更新的原生稳定版' : 'No newer native stable release is available') :
-        (zh ? '此项目尚无已发布的原生稳定版' : 'No native stable releases have been published');
+        (zh ? '没有比当前版本更新的原生稳定版' : 'No newer native stable release is available');
       const answer = await electron.dialog.showMessageBox(window, { type: 'info', title, message, detail,
         buttons: latest ? [zh ? '关闭' : 'Close', zh ? '打开发布页面' : 'Open release page',
           ...(result.status === 'available' && result.signed ? [zh ? '下载、更新并重启' : 'Download, update and restart'] : [])] : [zh ? '关闭' : 'Close'],

@@ -65,11 +65,15 @@ async function main() {
   ]) { const value = manifest(); change(value); assert.throws(() => verify(value), { code: 'EPROTO' }); }
   assert.throws(() => verify(manifest(), { ...context, checkerSha256: '0'.repeat(64) }), { code: 'EBASE' });
   assert.throws(() => verify(manifest(), { ...context, current: { build: 'hit-native-linux-ia32-r45.12', version: 'r45.12' } }), { code: 'EPROTO' });
+  assert.equal(verify(manifest(), { ...context, allowCurrent: true, current: { build: 'hit-native-linux-ia32-r45.12', version: 'r45.12' } }).installer, null);
   const initial = assetUrl(context.version, 'native-update.json');
   for (const value of ['http://github.com/test', 'https://evil.example/test', 'https://github.com/other/repo',
     'https://user:password@release-assets.githubusercontent.com/file', 'https://release-assets.githubusercontent.com:443/file#fragment'])
     assert.throws(() => redirectUrl(value, initial), { code: 'EPROTO' });
   assert.equal(redirectUrl('https://release-assets.githubusercontent.com/file?token=opaque', initial), 'https://release-assets.githubusercontent.com/file?token=opaque');
+  const channelUrl = require('./update_config').channelManifest;
+  assert.equal(redirectUrl(assetUrl(context.version, 'native-update.json'), channelUrl), assetUrl(context.version, 'native-update.json'));
+  assert.throws(() => redirectUrl(assetUrl(context.version, 'install_desktop.py'), channelUrl), { code: 'EPROTO' });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'welink-signed-download-'));
   const filename = path.join(temporary, 'installer.py');
   const options = { url: assetUrl(context.version, 'install-r45.12-from-r45.11.py'), filename, size: 3,
@@ -104,6 +108,12 @@ async function main() {
   assert.equal(probe().mounted, false, 'A complete shell at LoadingFailed cannot count as readiness');
   scope.window.getRoute = () => 'main/im';
   assert.equal(probe().mounted, true);
+  scope.window.getRoute = () => 'login/WPFirstTimeAuthentication/empty';
+  const controls = new Set(['.single-list-wrap:not(.verification-code) input.list-input', '.verification-code input.list-input', 'button.amu-btn-primary']);
+  scope.document.querySelector = selector => controls.has(selector) ? { getBoundingClientRect: () => ({ width: 10, height: 10 }) } : null;
+  assert.equal(probe().mounted, true, 'The observed first-time verification form is a working login surface');
+  controls.delete('.verification-code input.list-input');
+  assert.equal(probe().mounted, false, 'A partial first-time verification shell cannot count as readiness');
   delete scope.window.coreRsHttp.middleGroundPost;
   assert.equal(probe().httpExports.length, 3, 'Missing whole-SDK exports must remain observable');
   console.log(JSON.stringify({ status: 'passed', boundary: 'Deterministic signed manifest/download/readiness predicates; no GUI or live-network evidence.' }));

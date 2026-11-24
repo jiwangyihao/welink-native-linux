@@ -10,8 +10,8 @@ const { verifyManifest, revision } = require('../NativeIntegration/update_manife
 const args = process.argv.slice(2), values = new Map(), installers = [];
 for (let index = 0; index < args.length; index += 2) {
   const name = args[index], value = args[index + 1];
-  if (!value || !['--version', '--source-commit', '--private-key', '--public-key', '--output', '--integration', '--installer'].includes(name))
-    throw new Error('Usage: node NativeBuild/sign_update.js --version r45.N --source-commit COMMIT --private-key PRIVATE_PEM --public-key NativeIntegration/update_public_key.pem --output OUT --integration OUT/install_desktop.py --installer OUT/install-r45.N-from-r45.M.py [--installer ...]');
+  if (!value || !['--version', '--source-commit', '--private-key', '--public-key', '--output', '--integration', '--installer', '--notes'].includes(name))
+    throw new Error('Usage: node NativeBuild/sign_update.js --version r45.N --source-commit COMMIT --private-key PRIVATE_PEM --public-key NativeIntegration/update_public_key.pem --output OUT --integration OUT/install_desktop.py --installer OUT/install-r45.N-from-r45.M.py [--installer ...] [--notes FILE]');
   if (name === '--installer') installers.push(value);
   else { if (values.has(name)) throw new Error('Duplicate option: ' + name); values.set(name, value); }
 }
@@ -46,7 +46,8 @@ const entries = installers.map(filename => {
     throw new Error('Generated installer targets another image/integration asset');
   return { base: identity.baseBuild, baseCheckerSha256: identity.baseCheckerSha256, ...descriptor };
 }).sort((a, b) => a.base.localeCompare(b.base));
-const manifest = { format: 1, version, build: 'hit-native-linux-ia32-' + version, sourceCommit, installers: entries, integration };
+const manifest = { format: 1, version, build: 'hit-native-linux-ia32-' + version, sourceCommit,
+  name: 'Native Linux ' + version, notes: values.has('--notes') ? fs.readFileSync(values.get('--notes'), 'utf8') : '', installers: entries, integration };
 const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
 const signature = Buffer.from(crypto.sign(null, bytes, privateKey).toString('base64') + '\n');
 for (const item of entries) verifyManifest(bytes, signature, publicKeyBytes, { version,

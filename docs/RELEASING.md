@@ -39,9 +39,7 @@ The signed manifest includes `version`, `build`, full `sourceCommit`, all
 installer names/sizes/SHA256s/base checker hashes, and the integration
 name/size/SHA256. Tags, target identity, exact baseline, sizes and names must
 match. Duplicate/ambiguous entries, downgrades, unsafe paths and unsigned assets
-are rejected. API metadata never supplies an executable URL: downloads are
-constructed from this repository and tag. HTTPS redirects are limited to
-GitHub's explicit release-asset hosts, with bounded count and ordinary TLS.
+are rejected. Routine discovery reads the static `releases/latest/download/native-update.json` asset, not the rate-limited REST API. The discovered native tag selects a canonical tag manifest and signature; the two manifest byte streams must match, and the Ed25519 signature is required even when reporting `current`. Executable URLs never come from response data: downloads are constructed from this repository and tag. HTTPS redirects are limited to the explicit GitHub release/tag and release-asset hosts, with bounded count and ordinary TLS.
 
 ## Generate and sign a release
 
@@ -63,7 +61,7 @@ node NativeBuild/sign_update.js \
   --version "$VERSION" --source-commit "$SOURCE_COMMIT" \
   --private-key "$PRIVATE_SIGNING_KEY" \
   --public-key NativeIntegration/update_public_key.pem \
-  --output "$OUT" --integration "$OUT/install_desktop.py" \
+  --output "$OUT" --integration "$OUT/install_desktop.py" --notes "$RELEASE_NOTES" \
   --installer "$OUT/install-${VERSION}-from-${BASE_VERSION}.py"
 # Supply additional --installer arguments for additional supported baselines.
 (cd "$OUT" && sha256sum install-*.py install_desktop.py \
@@ -79,6 +77,8 @@ The signer's identity header comes from the actual generated installer. It
 refuses a mismatched target or integration hash and validates every manifest
 entry with the same protocol used by the client. Do not modify JSON whitespace
 or assets after signing.
+
+Release names and notes are included in the signed manifest. Publish the verified stable native release as GitHub's latest release; keep runtime-dependency releases marked `--latest=false`. A missing, inconsistent or invalid signed channel is an error, never a claim that the installed application is current.
 
 ## Publish
 
@@ -216,7 +216,7 @@ actual worker spawn/exec, cancellation versus exit and commit-lifetime ownership
 For genuine release-to-release GUI acceptance, use two actual immutable
 updater-enabled builds and a signed compatible stable release. Start the old
 application normally with its explicit isolated profile and
-`--remote-debugging-port=19249`. The following observer uses Node 22+ for CDP and
+`--remote-debugging-port=19249`. The read-only observer uses Python 3.12+ and the pinned dependency in `NativeIntegration/update-qa-requirements.txt` (install it in a test virtual environment); it
 invokes the real manual-check consumer; a person or desktop automation must
 operate the real native controls. It never inserts UI, patches routes, changes
 app state, supplies a fake release, or manufactures readiness.
@@ -224,15 +224,19 @@ app state, supplies a fake release, or manufactures readiness.
 ```sh
 # First cancel in the actual progress window during staging, then close the
 # real cancellation/error dialog. Old PID and integration/defaults must remain.
-node NativeIntegration/verify_native_update_surface.js \
+python3 NativeIntegration/verify_native_update_surface.py \
   --port 19249 --expect available --version "$BASE_VERSION" \
   --action cancel --target "$VERSION" --profile "$PROFILE"
 
 # Then choose Download, update and restart and allow the normal exit flow.
-node NativeIntegration/verify_native_update_surface.js \
+python3 NativeIntegration/verify_native_update_surface.py \
   --port 19249 --expect available --version "$BASE_VERSION" \
   --action install --target "$VERSION" --profile "$PROFILE"
 ```
+
+For a deliberately failed launch in an isolated fixture, `--action rollback`
+requires restored integration and an actual reopened old executable. `--home`
+points at the isolated HOME without changing Python module lookup.
 
 Capture actual download/staging/authorization UI. Verify the new executable and
 build identity, old PID exit, preserved profile/defaults, native readiness

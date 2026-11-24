@@ -562,6 +562,7 @@ raise RuntimeError('The requested rollback interruption was not reached')
             with self.assertRaisesRegex(RuntimeError, 'startup failed'):
                 check(dict(receipt, status='failed', error='missing shared HTTP exports'))
             self.assertEqual(check(receipt), child.pid)
+            self.assertEqual(check(dict(receipt, route='/login/WPFirstTimeAuthentication/empty')), child.pid)
             child.terminate(); child.wait()
             with self.assertRaisesRegex(RuntimeError, 'exited or was replaced'):
                 check(receipt)

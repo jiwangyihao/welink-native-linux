@@ -1,0 +1,2 @@
+# Read-only GUI acceptance transport; not an application runtime dependency.
+websockets==15.0.1

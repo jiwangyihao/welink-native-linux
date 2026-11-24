@@ -18,6 +18,8 @@ function inspectPedestal() {
   };
   const mounted = route === '/login/Auth2Login/Webview' ? visible('.auth2-login-webview') :
     route === '/login/LoginPage' ? visible('#pc-account') && visible('#password') :
+    route === '/login/WPFirstTimeAuthentication/empty' ? visible('.single-list-wrap:not(.verification-code) input.list-input') &&
+      visible('.verification-code input.list-input') && visible('button.amu-btn-primary') :
     route === '/main/im' ? visible('#mainView_im:not(.hidden)') : false;
   return { route, mounted, httpExports, exitProvider: !!(window.appService && typeof window.appService.exitApp === 'function') };
 }
@@ -73,7 +75,7 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
         return;
       }
       if (!evidence.mounted || !evidence.exitProvider || evidence.httpExports.join(',') !== HTTP_EXPORTS.join(',')) { stable = 0; return; }
-      let surface = evidence.route === '/login/LoginPage';
+      let surface = evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
       for (const contents of all) {
         if (surface || contents === pedestal || contents.isDestroyed() || contents.isLoading()) continue;
         if (evidence.route === '/main/im' && canonical(contents, appRoot, 'viewcontainer.html')) {

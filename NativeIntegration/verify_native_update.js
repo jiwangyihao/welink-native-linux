@@ -50,39 +50,39 @@ let shellError = false;
 let groups = 0;
 
 function response(items, extra = {}) { return { body: JSON.stringify(items), ...extra }; }
-function release(version, extra = {}) {
-  return { tag_name: version, html_url: config.releasePage + version, draft: false, prerelease: false,
-    name: 'Native ' + version, body: 'Native release notes for ' + version, ...extra };
-}
-function signedRelease(version) {
+const signedManifests = new Map();
+function channel(version, extra = {}) {
   const current = JSON.parse(fs.readFileSync(path.join(appRoot, 'native/build.json'), 'utf8')).build;
   const installedVersion = current.replace('hit-native-linux-ia32-', '');
+  const baseVersion = Number(version.slice(4)) > Number(installedVersion.slice(4)) ? installedVersion : 'r45.' + (Number(version.slice(4)) - 1);
+  const base = 'hit-native-linux-ia32-' + baseVersion;
   const checker = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
   const manifest = manifestChange({ format: 1, version, build: 'hit-native-linux-ia32-' + version, sourceCommit: 'a'.repeat(40),
-    installers: [{ base: current, baseCheckerSha256: checker, asset: 'install-' + version + '-from-' + installedVersion + '.py', size: 1, sha256: 'b'.repeat(64) }],
+    name: 'Native ' + version, notes: extra.notes === undefined ? 'Native release notes for ' + version : extra.notes,
+    installers: [{ base, baseCheckerSha256: checker, asset: 'install-' + version + '-from-' + baseVersion + '.py', size: 1, sha256: 'b'.repeat(64) }],
     integration: { asset: 'install_desktop.py', size: 1, sha256: 'c'.repeat(64) } });
   const bytes = Buffer.from(JSON.stringify(manifest));
   const signature = crypto.sign(null, bytes, testPrivateKey);
   if (signatureCorrupt) signature[0] ^= 1;
-  return { bytes, signature: Buffer.from(signature.toString('base64') + '\n') };
+  signedManifests.set(version, { bytes, signature: Buffer.from(signature.toString('base64') + '\n') });
+  return { body: bytes, ...extra };
 }
 
 // Transport fixture follows the Electron 22 ClientRequest/IncomingMessage
 // event contract, including abort, errors, body streaming and redirects.
 const net = { request(options) {
   const asset = /\/releases\/download\/(r45\.[0-9]+)\/native-update\.(json|sig)$/.exec(options.url);
-  const signed = asset && signedRelease(asset[1]);
-  const plan = asset ? { body: asset[2] === 'json' ? signed.bytes : signed.signature } : replies.shift();
+  const signed = asset && signedManifests.get(asset[1]);
+  const plan = asset ? signed && { body: asset[2] === 'json' ? signed.bytes : signed.signature } : replies.shift();
   assert(plan, 'Unexpected network request or automatic retry');
   const request = new EventEmitter();
   request.options = options;
   request.headers = {};
   request.setHeader = (name, value) => { request.headers[name] = value; };
   request.abort = () => { request.aborted = true; request.emit('abort'); };
-  request.end = () => queueMicrotask(() => {
+  const deliver = () => {
     if (request.aborted || plan.hang) return;
     if (plan.error) { request.emit('error', new Error(plan.error)); return; }
-    if (plan.redirect) { request.emit('redirect', 302, 'GET', plan.redirect, {}); return; }
     const stream = new EventEmitter();
     stream.statusCode = plan.status || 200;
     stream.headers = { 'content-type': ['application/json; charset=utf-8'], ...plan.headers };
@@ -94,7 +94,9 @@ const net = { request(options) {
     }
     if (plan.incomplete) stream.emit('close');
     else { stream.emit('end'); stream.emit('close'); }
-  });
+  };
+  request.followRedirect = () => queueMicrotask(deliver);
+  request.end = () => queueMicrotask(() => plan.redirect ? request.emit('redirect', 302, 'GET', plan.redirect) : deliver());
   requests.push(request);
   return request;
 } };
@@ -192,7 +194,7 @@ function expression(relative, predicate) {
 function evaluate(text, additions = {}) {
   return vm.runInNewContext('(' + text + ')', { window, Pedestal: window.Pedestal, process: window.process, ...additions }, { timeout: 10000 });
 }
-async function manual(plan, expected, expectedRequests = expected === 'available' ? 3 : 1) {
+async function manual(plan, expected, expectedRequests = expected === 'available' || expected === 'current' ? 3 : 1) {
   const before = requests.length;
   replies.push(plan);
   const result = await window.coreUpgrade.checkUpgrade({ entry: 'aboutPage', isUserClick: true });
@@ -210,58 +212,49 @@ async function run() {
   const currentVersion = match[1], revision = Number(match[2]);
   const nextVersion = 'r45.' + (revision + 1);
   const boundary = 10 ** String(revision).length;
-  const numericOlder = 'r45.' + (boundary - 1), numericNewer = 'r45.' + boundary;
+  const numericNewer = 'r45.' + boundary;
   choices.push(1);
-  const available = await manual(response([
-    release(currentVersion), release(numericNewer), release('r45.999', { draft: true }),
-    release('r45.998', { prerelease: true }), release('not-a-version'), release('r46.1'),
-    release(numericOlder, { assets: [{ browser_download_url: 'https://example.invalid/WindowsPackage.exe' }] })
-  ]), 'available');
+  const available = await manual(channel(numericNewer), 'available');
   assert.equal(available.latest.version, numericNewer, 'Native versions must compare numerically across digit boundaries');
   assert.equal(available.action, 'release-page-opened');
   assert.deepEqual(opened, [config.releasePage + numericNewer]);
   assert(dialogs.at(-1).detail.includes(currentVersion));
   assert(dialogs.at(-1).detail.includes('Native release notes for ' + numericNewer));
-  assert.match(dialogs.at(-1).detail, /publisher-signed/);
   assert.equal(available.signed, true);
-  assert(!('assets' in available.latest), 'Untrusted API asset URLs must not enter the native update protocol');
+  assert(!('assets' in available.latest), 'Executable URLs must not enter renderer update metadata');
   ++groups;
 
   for (const body of ['Preview heading\n' + 'wrapped content '.repeat(600) + '\nEnd of full notes',
     'Preview heading\n' + 'short line\n'.repeat(900) + 'End of full notes']) {
-    const result = await manual(response([release(nextVersion, { body })]), 'available');
+    const result = await manual(channel(nextVersion, { notes: body }), 'available');
     assert(dialogs.at(-1).detail.includes('Preview heading'));
     assert(!dialogs.at(-1).detail.includes('End of full notes'), 'Long notes must not push native dialog controls off screen');
     assert.equal(result.latest.notes, body, 'The receipt retains the full release notes');
   }
   ++groups;
 
-  await manual(response([release(currentVersion), release('r45.8')]), 'current');
-  assert.match(dialogs.at(-1).message, /No newer native stable release/);
-  await manual(response([]), 'no-releases');
-  assert.match(dialogs.at(-1).message, /No native stable releases have been published/);
-  assert.deepEqual(dialogs.at(-1).buttons, ['Close']);
-  await manual(response([release('r45.10-beta'), release('r45.999', { prerelease: true })]), 'no-releases');
+  const current = await manual(channel(currentVersion), 'current');
+  assert.equal(current.signed, true, 'Current status still requires publisher verification');
+  const older = await manual(channel('r45.' + (revision - 1)), 'current');
+  assert.equal(older.latest.version, 'r45.' + (revision - 1));
+  assert.equal(nativeInstalls, 0, 'An old signed release cannot cause a downgrade');
   ++groups;
 
   for (const [plan, code] of [
-    [response([{}]), 'EPROTO'],
-    [response([release('r45.9'), release(4510)]), 'EPROTO'],
+    [response({}), 'EPROTO'],
+    [response({ version: 4510 }), 'EPROTO'],
     [{ error: 'net::ERR_CERT_AUTHORITY_INVALID' }, 'ENETWORK'],
     [{ body: '{broken' }, 'EPROTO'],
-    [response({ tag_name: 'r45.10' }), 'EPROTO'],
-    [response([release('r45.10', { body: 123 })]), 'EPROTO'],
-    [response([release('r45.10', { draft: undefined })]), 'EPROTO'],
-    [response([release('r45.10', { html_url: 'https://github.com/evil/repo/releases/tag/r45.10' })]), 'EPROTO'],
-    [response([release('r45.10', { html_url: config.releasePage + 'r45.10?download=WindowsPackage.exe' })]), 'EPROTO'],
-    [response([], { status: 429, headers: { 'retry-after': ['60'] } }), 'ERATELIMIT'],
-    [response([], { status: 403, headers: { 'x-ratelimit-remaining': ['0'] } }), 'ERATELIMIT'],
-    [response([], { status: 404 }), 'EHTTP'],
+    [response({ version: 'r46.1' }), 'EPROTO'],
+    [response({ version: 'r45.10-beta' }), 'EPROTO'],
+    [response({}, { status: 429 }), 'EHTTP'],
+    [response({}, { status: 403 }), 'EHTTP'],
+    [response({}, { status: 404 }), 'EHTTP'],
     [{ redirect: 'https://example.invalid/WindowsPackage.exe' }, 'EPROTO'],
-    [response([], { headers: { 'content-type': ['text/html'] } }), 'EPROTO'],
-    [response([], { headers: { 'content-length': [String(config.maxBytes + 1)] } }), 'E2BIG'],
-    [{ chunks: [Buffer.alloc(config.maxBytes), Buffer.from('x')] }, 'E2BIG'],
-    [response([], { incomplete: true }), 'ENETWORK']
+    [{ body: '<html>not a manifest</html>' }, 'EPROTO'],
+    [response({}, { headers: { 'content-length': [String(config.maxManifestBytes + 1)] } }), 'ESIZE'],
+    [{ chunks: [Buffer.alloc(config.maxManifestBytes), Buffer.from('x')] }, 'ESIZE'],
+    [response({}, { incomplete: true }), 'ENETWORK']
   ]) {
     const before = opened.length;
     const result = await manual(plan, 'error');
@@ -271,28 +264,25 @@ async function run() {
   }
   ++groups;
 
-  replies.push(response([release('r45.10')], { headers: { link: ['<' + config.api + '?page=2>; rel="next"'] } }), response([release('r45.101')]));
-  const paged = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
-  assert.equal(paged.latest.version, 'r45.101');
-  assert(requests.filter(item => item.options.url.startsWith(config.api)).at(-1).options.url.endsWith('&page=2'));
-  const beforePages = requests.length;
-  for (let page = 0; page < config.maxPages; page++) replies.push(response([], { headers: { link: ['<' + config.api + '?page=999>; rel="next"'] } }));
-  const tooMany = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
-  assert.equal(tooMany.error.code, 'E2BIG');
-  assert.equal(requests.length - beforePages, config.maxPages);
+  const mismatched = channel(nextVersion);
+  signedManifests.get(nextVersion).bytes = Buffer.from('{}');
+  const mismatch = await manual(mismatched, 'error', 2);
+  assert.equal(mismatch.error.code, 'EPROTO', 'Discovery must match the canonical tag bytes');
+  const redirected = channel(nextVersion, { redirect: manifestProtocol.assetUrl(nextVersion, 'native-update.json') });
+  await manual(redirected, 'available');
   ++groups;
 
   const beforeSilent = { dialogs: dialogs.length, opened: opened.length };
   for (const check of [() => window.coreUpgrade.checkUpgrade({ entry: 'startup' }),
     () => window.coreUpgrade.checkUpdateBeforeLogin(), () => native.actions.showPcUpdateModel(),
     () => native.transport.upgradeByHttp()]) {
-    replies.push(response([release(nextVersion)]));
+    replies.push(channel(nextVersion));
     assert.equal((await check()).status, 'available');
   }
   assert.equal(dialogs.length, beforeSilent.dialogs, 'Automatic checks must not display upgrade UI');
   assert.equal(opened.length, beforeSilent.opened, 'Automatic checks must not open browsers');
   const beforeConcurrent = { requests: requests.length, dialogs: dialogs.length };
-  replies.push(response([release(nextVersion)]));
+  replies.push(channel(nextVersion));
   const concurrent = await Promise.all([window.coreUpgrade.checkUpgrade({ isUserClick: true }), window.coreUpgrade.checkUpgrade({ isUserClick: true })]);
   assert(concurrent.every(item => item.status === 'available'));
   assert.equal(requests.length, beforeConcurrent.requests + 3);
@@ -300,7 +290,7 @@ async function run() {
   ++groups;
 
   for (const fn of [native.actions.clickConfirmUpdate]) {
-    replies.push(response([release(nextVersion)]));
+    replies.push(channel(nextVersion));
     assert.equal((await fn()).status, 'available');
   }
   for (const fn of [native.actions.startDownload, native.actions.startInstallNewVer,
@@ -339,7 +329,7 @@ async function run() {
 
   choices.push(1);
   shellError = true;
-  const openFailure = await manual(response([release(nextVersion)]), 'error', 3);
+  const openFailure = await manual(channel(nextVersion), 'error', 3);
   shellError = false;
   assert.match(openFailure.error.message, /browser refused/);
   assert.equal(openFailure.action, undefined, 'Browser launch failure cannot claim success');
@@ -351,23 +341,24 @@ async function run() {
     value => ({ ...value, build: 'hit-native-linux-ia32-r45.0' }),
     value => ({ ...value, installers: [...value.installers, value.installers[0]] }),
     value => ({ ...value, installers: [{ ...value.installers[0], baseCheckerSha256: '0'.repeat(64) }] }),
-    value => ({ ...value, integration: { ...value.integration, asset: '../install_desktop.py' } })
+    value => ({ ...value, integration: { ...value.integration, asset: '../install_desktop.py' } }),
+    value => ({ ...value, notes: 123 })
   ]) {
     manifestChange = change;
-    replies.push(response([release(nextVersion)]));
+    replies.push(channel(nextVersion));
     const failed = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
     assert.equal(failed.status, 'error');
     assert(['EPROTO', 'EBASE'].includes(failed.error.code));
   }
   manifestChange = value => value;
   signatureCorrupt = true;
-  replies.push(response([release(nextVersion)]));
+  replies.push(channel(nextVersion));
   assert.equal((await window.coreUpgrade.checkUpgrade({ isUserClick: true })).error.code, 'ESIGNATURE');
   signatureCorrupt = false;
   assert.equal(nativeInstalls, beforeInstall, 'Failed signatures/compatibility cannot reach native execution');
   assert.equal(normalExits, 0, 'Checking never exits the application');
   choices.push(2);
-  replies.push(response([release(nextVersion)]));
+  replies.push(channel(nextVersion));
   const staged = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
   assert.equal(staged.status, 'staged', 'Staging is not installation success');
   assert.equal(staged.action, 'restart-required');
@@ -386,10 +377,10 @@ async function run() {
   ++groups;
 
   for (const request of requests) {
-    assert(request.options.url.startsWith(config.api + '?') ||
+    assert(request.options.url === config.channelManifest ||
       /^https:\/\/github\.com\/jiwangyihao\/welink-native-linux\/releases\/download\/r45\.[0-9]+\/native-update\.(json|sig)$/.test(request.options.url));
     assert.equal(request.options.session, contents.session);
-    assert.equal(request.options.redirect, request.options.url.startsWith(config.api) ? 'error' : 'manual');
+    assert.equal(request.options.redirect, 'manual');
     assert.equal(request.options.credentials, 'omit');
     assert.equal(request.options.useSessionCookies, false);
   }
