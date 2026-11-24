@@ -2,7 +2,7 @@
 
 This repository contains the native port and build recipes, **not the commercial client**. `NativeBuild/full_build.py` obtains the exact pinned inputs from their publishers (or verifies lawfully supplied original archives), compiles the real native libraries/workers and FFI, prepares the application, builds its manifest-specific integrity checker, and finalizes a usable image. No existing client, extracted source cache, account, or developer workspace is a build prerequisite. Building and running proprietary inputs still requires the applicable rights; a successful build is not desktop or account acceptance.
 
-The release identity is `hit-native-linux-ia32-r45.15`. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
+The examples below use the explicit candidate identity `hit-native-linux-ia32-r45.15`; this does not claim publication or acceptance with an existing profile. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
 
 ## Host prerequisites
 

@@ -21,12 +21,12 @@
 
 ### Bash、星火常用 DEB 与 APM
 
-r45.14 起提供标准 Debian/星火格式与真实 APM 容器包；当前版本为 `cn.edu.hit.welink.native_45.15-1_amd64.deb` 和 `cn.edu.hit.welink.native.apm_45.15-1-apm_amd64.deb`。这表示提供相应格式，不表示已获星火商店上架审核。
+当前公开安装包为 `cn.edu.hit.welink.native_45.14-1_amd64.deb`（标准 Debian/星火格式）和 `cn.edu.hit.welink.native.apm_45.14-1-apm_amd64.deb`（真实 APM 容器包）。新的兼容性修正仍在候选验收阶段，尚未发布；提供这些格式也不表示已获星火商店上架审核。
 
 复制执行的入口是 Bash，不需要手动调用 Python 安装器：
 
 ```sh
-curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.15/install.sh -o install-welink.sh
+curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.14/install.sh -o install-welink.sh
 bash install-welink.sh
 # 或者选择已安装 APM 的系统：
 bash install-welink.sh --apm
@@ -73,7 +73,9 @@ python3 NativeBuild/full_build.py \
 
 最近的本地基线验收覆盖了加密数据库查询、IPv4/IPv6 本地 TLS、窗口/协议唤醒、图片剪贴板和会议退出回执。生产企业会议、真实音视频质量、全部会话类型及每一种桌面合成器仍需各自验证。不要从一次无错误日志推导“所有功能完成”。
 
-r45.15 的隔离回归另外覆盖当前固定 WebRTC 消费者、真实音频输出 API 的完成/拒绝、文件复制错误传播、ZIP/ZIP64 完整性与原子替换一致性、超过 2 GiB 的有界内存复制和压缩，以及 renderer 崩溃/导航/关闭失败后的恢复与浏览器令牌清理。原生 X11、访客语音、自定义背景和报告路径使用合成输入与本地服务验证；不表示真实企业会议授权、硬件媒体质量或官方举报已经受理。网络变化仍显式返回错误，不以静默重试或伪造成功掩盖。
+兼容性候选的隔离回归另外覆盖当前固定 WebRTC 消费者、真实音频输出 API 的完成/拒绝、文件复制错误传播、ZIP/ZIP64 完整性与原子替换一致性、超过 2 GiB 的有界内存复制和压缩，以及 renderer 崩溃/导航/关闭失败后的恢复与浏览器令牌清理。原生 X11、访客语音、自定义背景和报告路径使用合成输入与本地服务验证；不表示真实企业会议授权、硬件媒体质量或官方举报已经受理。网络变化仍显式返回错误，不以静默重试或伪造成功掩盖。
+
+现有资料上的正式升级验收仍未完成，不能把上述隔离结果视为正式更新成功。公开安装入口暂保持 r45.14，以发行页标注的稳定版为准。
 
 仍需注意：Electron 22 / Node 16 已过时；目前固定支持的上游、ia32 ABI 和 X11 桌面范围有限。新的上游版本、ARM、原生 Wayland、实际会议授权及媒体质量都需要各自验证，不能由“能构建”或“能更新”推导为已经支持。
 
