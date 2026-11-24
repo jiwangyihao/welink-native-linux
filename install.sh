@@ -8,11 +8,11 @@ Usage: bash install.sh [--apm] [--version r45.N] [--verify-only]
        bash install.sh --help
 
 Install the signed Linux amd64 package from jiwangyihao/welink-native-linux.
-The default is the normal DEB at r45.17; --apm selects the separate APM package.
+The default is the normal DEB at r45.18; --apm selects the separate APM package.
 Only canonical r45.N releases are accepted (no leading zeroes in N).
 
   --apm           Use sudo apm install instead of sudo apt-get install.
-  --version TAG   Select an explicit release, for example r45.17.
+  --version TAG   Select an explicit release, for example r45.18.
   --verify-only   Download and authenticate the selected package, print its
                   SHA256 and size, then remove downloads without installing.
   --help          Show this help.
@@ -32,7 +32,7 @@ fail() {
     exit 1
 }
 
-version=r45.17
+version=r45.18
 version_set=0
 kind=deb
 verify_only=0
@@ -54,7 +54,7 @@ while (( $# )); do
     esac
 done
 if [[ ! $version =~ ^r45\.(0|[1-9][0-9]{0,15})$ ]]; then
-    fail 'Version must be a canonical r45.N release, for example r45.17.'
+    fail 'Version must be a canonical r45.N release, for example r45.18.'
 fi
 revision=${version#r45.}
 if (( 10#$revision > 9007199254740991 )); then

@@ -20,12 +20,16 @@ function inspectPedestal() {
   // A former mainView placeholder or separate viewcontainer is not readiness.
   const message = route === '/main/im' ? document.querySelector('[data-watermark="im-container"]') : null;
   const messageRect = message && message.getBoundingClientRect();
-  const mounted = route === '/login/Auth2Login/Webview' ? visible('.auth2-login-webview') :
+  const privacyRoot = '.pc-public-modal:not(.none) .after-login-privacy-state-page ';
+  const privacy = route === '/login' && visible(privacyRoot + '.privacy-state-content-wrap') &&
+    visible(privacyRoot + '[data-testid="FirstPrivacyAgree000123"]') &&
+    visible(privacyRoot + '[data-testid="FirstPrivacyDisagree000123"]');
+  const mounted = privacy || (route === '/login/Auth2Login/Webview' ? visible('.auth2-login-webview') :
     route === '/login/LoginPage' ? visible('#pc-account') && visible('#password') :
     route === '/login/WPFirstTimeAuthentication/empty' ? visible('.single-list-wrap:not(.verification-code) input.list-input') &&
       visible('.verification-code input.list-input') && visible('button.amu-btn-primary') :
-    route === '/main/im' ? !!(message && message.children.length && messageRect.width > 0 && messageRect.height > 0) : false;
-  return { route, mounted, httpExports, exitProvider: !!(window.appService && typeof window.appService.exitApp === 'function') };
+    route === '/main/im' ? !!(message && message.children.length && messageRect.width > 0 && messageRect.height > 0) : false);
+  return { route, mounted, privacy, httpExports, exitProvider: !!(window.appService && typeof window.appService.exitApp === 'function') };
 }
 function inspectLogin() {
   return document.readyState === 'complete' && Array.from(document.querySelectorAll('input,button,canvas')).some(element => {
@@ -112,7 +116,7 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
         stable = 0;
         return;
       }
-      let surface = evidence.route === '/main/im' || evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
+      let surface = evidence.privacy || evidence.route === '/main/im' || evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
       for (const contents of all) {
         if (surface || contents === pedestal || contents.isDestroyed() || contents.isLoading()) continue;
         if (evidence.route === '/login/Auth2Login/Webview' && /^https:\/\//.test(contents.getURL())) {
