@@ -100,9 +100,14 @@ async function run() {
     assert.equal(owner, undefined, 'Invalid private capability requests opened a meeting owner');
     const prepared = await service('capabilityService.prepareInvitationResolver()'); assert.equal(prepared.ok, true);
     assert(owner, 'No real IPC owner');
-    const session = await owner.initializeSession();
-    session.setCertificateVerifyProc((request, done) => done(request.hostname === '127.0.0.1' &&
-      new X509Certificate(request.certificate.data).fingerprint256 === fingerprint ? 0 : -3));
+    const initializeSession = owner.initializeSession;
+    owner.initializeSession = async function (...args) {
+      const current = await initializeSession.apply(this, args);
+      current.setCertificateVerifyProc((request, done) => done(request.hostname === '127.0.0.1' &&
+        new X509Certificate(request.certificate.data).fingerprint256 === fingerprint ? 0 : -3));
+      return current;
+    };
+    await owner.initializeSession();
     owner.options.requestPermission = async () => { receipts.permissionRequests++; return false; };
     async function configure(type, isEnable) {
       const reply = await service(`capabilityService.setEnableCapability(${JSON.stringify({ type, isEnable })})`);

@@ -21,12 +21,12 @@
 
 ### Bash、星火常用 DEB 与 APM
 
-r45.14 起提供两种实际软件包：`cn.edu.hit.welink.native_45.14-1_amd64.deb`（标准 Debian/星火格式）和 `cn.edu.hit.welink.native.apm_45.14-1-apm_amd64.deb`（真实 APM 容器包）。这表示提供相应格式，不表示已获星火商店上架审核。
+r45.14 起提供标准 Debian/星火格式与真实 APM 容器包；当前版本为 `cn.edu.hit.welink.native_45.15-1_amd64.deb` 和 `cn.edu.hit.welink.native.apm_45.15-1-apm_amd64.deb`。这表示提供相应格式，不表示已获星火商店上架审核。
 
 复制执行的入口是 Bash，不需要手动调用 Python 安装器：
 
 ```sh
-curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.14/install.sh -o install-welink.sh
+curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.15/install.sh -o install-welink.sh
 bash install-welink.sh
 # 或者选择已安装 APM 的系统：
 bash install-welink.sh --apm
@@ -57,9 +57,9 @@ r45.11 修正共享 HTTP 脚本在真实页面加载时的模块路径；r45.9 /
 
 ```sh
 python3 NativeBuild/full_build.py \
-  --work "$PWD/.work/full-r45.14" \
+  --work "$PWD/.work/full-r45.15" \
   --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.14 \
+  --build-id hit-native-linux-ia32-r45.15 \
   --accept-vendor-terms
 ```
 

@@ -14,6 +14,15 @@ const { execFileSync } = require('child_process');
 const acorn = require(process.env.WELINK_TEST_ACORN || 'acorn');
 const { app, BrowserWindow } = require('electron');
 
+// These two test windows and their native view wrappers have process-bounded
+// ownership. Keep the complete tree rooted even after explicit destruction:
+// Electron must not finalize a WebContentsView from a GC weak callback while
+// later preparation runs after its creation context has been torn down.
+const rendererOwners = globalThis.__welinkRendererFileReceiptOwners = [];
+function phase(name, directory) {
+  console.log(JSON.stringify({ suite: 'renderer-file-receipts', phase: name, ...(directory ? { directory } : {}) }));
+}
+
 function visit(node, callback) {
   if (!node || typeof node.type !== 'string') return;
   callback(node);
@@ -405,30 +414,56 @@ async function rendererProof(input) {
   app.setPath('userData', path.join(root, 'runtime'));
   app.disableHardwareAcceleration();
   const results = [];
+  const inputs = [];
   try {
-    await app.whenReady();
     for (const [index, directory] of ['pedestal/im/static/js', 'plugin/im/dist/im/static/js'].entries()) {
       const fixture = path.join(root, String(index));
       fs.mkdirSync(fixture);
       for (const name of ['screenshots', 'logs']) fs.mkdirSync(path.join(fixture, name));
+      phase('preparing-consumers', directory);
       const input = { ...readModules(appRoot, directory), archives: makeArchives(fixture), appRoot, directory, root: fixture,
         screenshots: path.join(fixture, 'screenshots'), logs: path.join(fixture, 'logs'),
         native: path.join(appRoot, 'native/ffi.js'),
         ffi: path.join(appRoot, 'libraries/node_extends/node-ffi/ffi-napi') };
+      inputs.push(input);
+      phase('consumers-prepared', directory);
+    }
+    // Parse both sealed bundle copies before any renderer/view exists. The
+    // runtime inputs remain the exact extracted factories, not replacements.
+    await app.whenReady();
+    for (const input of inputs) {
+      const { directory } = input;
       const window = new BrowserWindow({ show: false, webPreferences: {
         nodeIntegration: true, contextIsolation: false, sandbox: false
       } });
-      window.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+      const owner = { directory, window, webContents: window.webContents };
+      rendererOwners.push(owner);
+      owner.contentView = window.contentView;
+      owner.childViews = owner.contentView ? Array.from(owner.contentView.children) : [];
+      owner.webContents.session.webRequest.onBeforeRequest((details, callback) => {
         callback({ cancel: !details.url.startsWith('data:') });
       });
-      try {
-        await window.loadURL('data:text/html,<body>Isolated renderer file receipts</body>');
-        results.push(await window.webContents.executeJavaScript('(' + rendererProof.toString() + ')(' + JSON.stringify(input) + ')'));
-      } finally { if (!window.isDestroyed()) window.destroy(); }
+      phase('loading-renderer', directory);
+      await window.loadURL('data:text/html,<body>Isolated renderer file receipts</body>');
+      phase('running-consumer-proof', directory);
+      results.push(await owner.webContents.executeJavaScript('(' + rendererProof.toString() + ')(' + JSON.stringify(input) + ')'));
+      phase('consumer-proof-complete', directory);
     }
     const report = { passed: true, scope: 'both shipped renderer copies; synthetic files only', results };
     if (process.env.WELINK_TEST_OUTPUT)
       fs.writeFileSync(path.join(process.env.WELINK_TEST_OUTPUT, 'result.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
     console.log(JSON.stringify(report));
-  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    phase('report-published');
+  } finally {
+    try {
+      for (const owner of rendererOwners) {
+        if (owner.window.isDestroyed()) continue;
+        phase('closing-renderer', owner.directory);
+        await new Promise(resolve => {
+          owner.window.once('closed', resolve);
+          owner.window.destroy();
+        });
+      }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  }
 })().then(() => app.exit(0), error => { console.error(error.stack || error); app.exit(1); });

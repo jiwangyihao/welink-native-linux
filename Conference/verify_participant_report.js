@@ -53,7 +53,9 @@ async function answerConfirmation(accept){
  assert.match(id,/^\d+$/);await run('xdotool',['windowactivate','--sync',id],{timeout:2000});
  await run('xdotool',['key','--clearmodifiers',...(accept?['Right','Return']:['Escape'])]);
 }
-const opened=()=>policy.open({parent,target:selected,verify:async()=>authorizedTarget});
+const opened=()=>policy.open({parent,target:selected,verify:async()=>{
+ trace('verify target',authorizedTarget);return authorizedTarget;
+}});
 async function show(){
  const done=opened(); let early;
  done.then(receipt=>{early=receipt;},error=>{early={code:error.code,message:error.message};});
@@ -73,7 +75,11 @@ async function submit(win) {
     return {x:Math.round(r.left+r.width/2), y:Math.round(r.top+r.height/2)};
   })()`);
   win.focus();wc.focus();
+  await until(()=>win.isFocused() && wc.executeJavaScript('document.hasFocus()'),'report input focus');
   for (const type of ['mouseDown','mouseUp']) wc.sendInputEvent({type,...point,button:'left',clickCount:1});
+  await until(()=>win.isDestroyed() || wc.executeJavaScript('document.querySelector("button[type=submit]").disabled'),
+    'report submission handler');
+  trace('submit dispatched',wc.isDestroyed()?'closed':wc.id);
 }
 async function main(){
  await app.whenReady();

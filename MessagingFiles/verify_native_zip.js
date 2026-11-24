@@ -193,7 +193,7 @@ async function rejectArchive(filePath, password = '') {
     console.log(JSON.stringify({
       passed: true, ...unicode, independentReader: true, fileOnlyCounts: true,
       trailingDirectories: true, emptyArchives: true, completeEndRecords: true,
-      directoryIntegrity: true, zip64: true, damagedArchiveRejected: true,
+      directoryIntegrity: true, centralDirectoryTypes: true, zip64: true, damagedArchiveRejected: true,
       passwordChecks: true, jsonStreamSizeBound: true, ...copy, ...large, peakRssKiB
     }));
   } finally {

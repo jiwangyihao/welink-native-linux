@@ -14,6 +14,8 @@
 // boundary; the genuine broker captures/returns the resulting API rejection.
 // document-close-failure injects that same real Electron rejection at the owned
 // window's destroy boundary; the live document must immediately lose authority.
+// The recovery selection also checks synthetic observed credentials against an
+// actual loopback token endpoint: no real account or production token is used.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -898,6 +900,140 @@ async function rendererProof(input) {
     offlineBrowserCleanup: report.browser }, lateEnvelope);
 }
 
+async function closedBrowserRevocationProof(appRoot, origin, fixture) {
+  const { MeetingNativeWeb } = require(path.join(appRoot, 'native/meeting_native_web'));
+  let nativeTokenReads = 0;
+  const bridge = new MeetingNativeWeb({ electron, appRoot, origin,
+    getAccessToken: async () => { ++nativeTokenReads; throw new Error('Browser cleanup must not request a native credential'); } });
+  const tokens = Object.fromEntries(['confirmed', 'denied', 'native', 'unobserved'].map(name =>
+    [name, 'synthetic-' + name + '-' + bridge.instance]));
+  for (const [name, token] of Object.entries(tokens))
+    fixture.tokens.set(token, { name, status: name === 'denied' ? 401 : 200 });
+  let window, destroy, executeJavaScript, closeError;
+  const engineEvents = [], cleanupEvents = [];
+  bridge.on('engine', message => engineEvents.push(message));
+  bridge.on('event', message => { if (message.event === 'media-session-cleanup') cleanupEvents.push(message.data); });
+  try {
+    const ready = await bounded(bridge.execute('initialize'), 'genuine credential-cleanup provider initialization', 60000);
+    assert.equal(ready.event, 'engine-ready');
+    assert.equal(ready.sdkVersion, '1.10.96');
+    const state = await bridge.execute('state.get');
+    assert.equal(state.ready, true);
+    assert.equal(state.joined, false);
+    assert.ok(!state.roomJoined);
+    window = bridge.window;
+    destroy = window.destroy;
+    executeJavaScript = window.webContents.executeJavaScript;
+    const failedOwner = bridge.mediaOwner, failedPartition = bridge.partition;
+    // Main's known-credential inventory is synthetic. The provider store and
+    // readiness are untouched; no login, token event, grant or meeting is faked.
+    for (const name of ['confirmed', 'denied', 'native']) bridge.browserTokens.add(tokens[name]);
+    bridge.protectedNativeTokens.add(tokens.native);
+    fixture.isClosed = () => window.isDestroyed();
+    fixture.active = true;
+    const setMenu = window.setMenu;
+    window.destroy = function () {
+      try { setMenu.call(this, {}); }
+      catch (error) {
+        closeError = { code: error.code === undefined ? 'SESSION_LOGOUT_FAILED' : String(error.code),
+          message: String(error.message || 'The browser session operation failed') };
+        throw error;
+      }
+      throw new Error('Electron unexpectedly accepted an invalid Menu at the close boundary');
+    };
+    const lost = deferred();
+    const onLost = message => {
+      if (message.event === 'engine-unavailable' && message.reason === 'document-navigation') {
+        bridge.removeListener('engine', onLost);
+        lost.resolve(message);
+      }
+    };
+    bridge.on('engine', onLost);
+    const navigation = window.loadURL(origin + '/webrtc/?quarantined-credential-proof=1#/login');
+    navigation.catch(() => {});
+    await bounded(lost.promise, 'real credential-owner document loss');
+    await bounded(bridge.serial, 'failed-close receipt settlement');
+    await bounded(navigation, 'live quarantined replacement document', 60000);
+    assert.equal(window.isDestroyed(), false);
+    assert.equal(failedOwner.retired, true);
+    assert.equal(bridge.ready, null);
+    assert.deepEqual(cleanupEvents[0].errors, [{ stage: 'window-retirement', ...closeError }]);
+    assert.equal(cleanupEvents[0].localCleanupComplete, false);
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'MEDIA_OWNER_CHANGED');
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.native), error => error.code === 'NATIVE_TOKEN_OWNED');
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.unobserved), error => error.code === 'BROWSER_TOKEN_UNOWNED');
+
+    let failedDocumentCalls = 0;
+    window.webContents.executeJavaScript = function (...args) {
+      ++failedDocumentCalls;
+      return executeJavaScript.apply(this, args);
+    };
+    const rejected = promise => promise.then(() => { throw new Error('Unconfirmed cleanup unexpectedly succeeded'); }, error => error);
+    const liveError = await bounded(rejected(bridge.execute('session.logout')), 'still-live browser cleanup refusal');
+    const liveCleanup = liveError.details;
+    assert.equal(liveCleanup.localCleanup.window, 'failed');
+    assert.equal(liveCleanup.localCleanupComplete, false);
+    assert.ok(liveCleanup.errors.some(error => error.stage === 'window-cleanup' &&
+      error.code === closeError.code && error.message === closeError.message));
+    assert.equal(liveCleanup.errors.filter(error => error.stage === 'browser-token-delete' &&
+      error.code === 'MEDIA_OWNER_CHANGED').length, 2);
+    assert.deepEqual(liveCleanup.serverLogout, { status: 'unconfirmed', confirmed: false,
+      credentials: 3, revoked: 0, protectedNative: 1, unconfirmed: 2, inventoryConfirmed: false });
+    assert.equal(failedDocumentCalls, 0, 'Cleanup must not read fresh credentials from the quarantined document');
+    assert.deepEqual(fixture.requests, [], 'A still-live failed window cannot authorize any token DELETE');
+    assert.equal(bridge.mediaOwner, failedOwner);
+    assert.deepEqual([...bridge.browserTokens], [tokens.confirmed, tokens.denied, tokens.native],
+      'Unclosed cleanup must retain its known credentials for later explicit disposal');
+
+    window.webContents.executeJavaScript = executeJavaScript;
+    window.destroy = destroy;
+    const closed = new Promise(resolve => window.once('closed', resolve));
+    window.destroy();
+    await bounded(closed, 'exact quarantined credential-owner window closure');
+    assert.equal(window.isDestroyed(), true);
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'MEDIA_OWNER_CHANGED',
+      'Physical closure alone must not expose a general retired-owner revocation bypass');
+    const closedError = await bounded(rejected(bridge.execute('session.logout')), 'closed-owner actual token revocation', 60000);
+    const closedCleanup = closedError.details;
+    assert.equal(closedCleanup.localCleanupComplete, true);
+    for (const key of ['revocationStorage', 'revocationCache', 'revocationAuthCache', 'revocationConnections'])
+      assert.equal(closedCleanup.localCleanup[key], 'cleared');
+    assert.deepEqual(closedCleanup.serverLogout, { status: 'unconfirmed', confirmed: false,
+      credentials: 3, revoked: 1, protectedNative: 1, unconfirmed: 1, inventoryConfirmed: false });
+    const tokenFailures = closedCleanup.errors.filter(error => error.stage === 'browser-token-delete');
+    assert.equal(tokenFailures.length, 1);
+    assert.equal(tokenFailures[0].code, '401');
+    assert.equal(tokenFailures[0].status, 401, 'A genuine HTTP 401 must remain unconfirmed, not become logout success');
+    assert.deepEqual(fixture.requests, ['confirmed', 'denied'].map(name => ({ credential: name,
+      method: 'DELETE', path: '/v1/usg/acs/token', query: [['timeout', 'false']],
+      status: name === 'denied' ? 401 : 200, physicallyClosed: true, accessTokenHeader: false, cookie: false })));
+    assert.equal(nativeTokenReads, 0);
+    assert.notEqual(bridge.mediaOwner, failedOwner);
+    assert.notEqual(bridge.partition, failedPartition);
+    assert.equal(bridge.mediaOrigin, origin);
+    assert.equal(failedOwner.retired, true);
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'BROWSER_TOKEN_UNOWNED');
+    assert.equal(fixture.requests.length, 2, 'Neither a native token nor a stale owner may issue an extra DELETE');
+    assert.equal(engineEvents.filter(message => message.event === 'engine-ready').length, 1);
+    const disposal = await bridge.execute('dispose');
+    assert.equal(disposal.disposed, true);
+    assert.equal(disposal.localCleanupComplete, true);
+    return { mode: 'closed-browser-revocation', genuineReady: { instance: ready.instance,
+      sequence: ready.sequence, sdkVersion: ready.sdkVersion }, liveCleanup, closedCleanup,
+      requests: fixture.requests, nativeTokenReads, failedDocumentCredentialReads: failedDocumentCalls,
+      nativeTokenProtected: true, staleOwnerRejected: true };
+  } finally {
+    try {
+      if (window && !window.isDestroyed()) {
+        window.webContents.executeJavaScript = executeJavaScript;
+        window.destroy = destroy;
+        window.destroy();
+      }
+      if (!bridge.disposed) await bounded(bridge.execute('dispose'), 'credential-proof final browser disposal', 60000);
+    } finally { fixture.active = false; fixture.isClosed = () => false; }
+  }
+}
+
 (async () => {
   assert.equal(process.platform, 'linux');
   assert.equal(process.arch, 'ia32', 'Use the sealed ia32 Electron runtime');
@@ -928,8 +1064,21 @@ async function rendererProof(input) {
   const fingerprint = new X509Certificate(certificate.cert).fingerprint256;
   let fixtureResponses = 0;
   const sockets = new Set();
+  const revocationFixture = { active: false, tokens: new Map(), requests: [], isClosed: () => false };
   const provider = https.createServer({ key: certificate.key, cert: certificate.cert }, (request, response) => {
-    const pathname = new URL(request.url, 'https://127.0.0.1').pathname;
+    const url = new URL(request.url, 'https://127.0.0.1');
+    const pathname = url.pathname;
+    if (revocationFixture.active && request.method === 'DELETE' && pathname === '/v1/usg/acs/token') {
+      const credential = revocationFixture.tokens.get(request.headers['x-auth-token']);
+      const status = credential ? credential.status : 403;
+      revocationFixture.requests.push({ credential: credential?.name || 'unknown', method: request.method,
+        path: pathname, query: [...url.searchParams], status, physicallyClosed: revocationFixture.isClosed(),
+        accessTokenHeader: request.headers['x-access-token'] !== undefined, cookie: request.headers.cookie !== undefined });
+      response.writeHead(status, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify(status === 200 ? { returnCode: 0 } :
+        { error_code: String(status), error_msg: 'Synthetic loopback token rejection' }));
+      return;
+    }
     if (request.method !== 'GET' || !pathname.startsWith('/webrtc/')) {
       response.writeHead(503); response.end(); return;
     }
@@ -974,7 +1123,7 @@ async function rendererProof(input) {
     session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (request, callback) => {
       if (/^https?:|^wss?:/.test(request.url)) {
         const url = new URL(request.url);
-        if (['ready', 'renderer-loss', 'document-navigation', 'document-close-failure', 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(activeMode) &&
+        if (['ready', 'renderer-loss', 'document-navigation', 'document-close-failure', 'closed-browser-revocation', 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(activeMode) &&
             url.origin === providerOrigin) { callback({}); return; }
         ++blockedNetworkRequests;
         if (armed && url.origin === ORIGIN && request.resourceType === 'mainFrame') {
@@ -1182,6 +1331,10 @@ async function rendererProof(input) {
       results.push(result);
       releaseMediaFault();
       service = null;
+    }
+    if (modes.includes('document-close-failure')) {
+      activeMode = 'closed-browser-revocation';
+      results.push(await closedBrowserRevocationProof(appRoot, providerOrigin, revocationFixture));
     }
     const cleanup = await bounded(disposeBroker(), 'real main broker cleanup');
     const offlineReceipts = results.map(result => result.offlineBrowserCleanup).filter(Boolean);

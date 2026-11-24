@@ -87,6 +87,8 @@ function validAccessToken(value) {
 }
 
 class MeetingNativeWeb extends EventEmitter {
+  #closedBrowserRevocation = null;
+
   constructor(options) {
     super();
     this.options = options || {};
@@ -227,6 +229,7 @@ class MeetingNativeWeb extends EventEmitter {
     // same site. Old request observers retain their old token sets, not these.
     if (this.window && !this.window.isDestroyed())
       throw failure('MEDIA_OWNER_BUSY', 'The existing media window must be closed before changing its site');
+    this.#closedBrowserRevocation = null;
     this.mediaOwner.retired = true;
     this.partition = this.channel + '-' + crypto.randomBytes(16).toString('hex');
     this.mediaOwner = { origin, partition: this.partition, retired: false };
@@ -519,6 +522,9 @@ class MeetingNativeWeb extends EventEmitter {
           // A live window which refused destruction is no longer a trusted
           // media document. Existing owner checks revoke IPC, delayed permission
           // grants and browser requests until explicit cleanup confirms closure.
+          this.#closedBrowserRevocation ||= { owner: this.mediaOwner, window,
+            origin: this.mediaOrigin, partition: this.partition, tokens: this.browserTokens,
+            session: null, ready: null };
           this.mediaOwner.retired = true;
           this.retiring = true;
         }
@@ -1542,16 +1548,46 @@ class MeetingNativeWeb extends EventEmitter {
     this.browserInventoryComplete = true;
   }
 
-  async revokeBrowserCredential(token) {
-    const owner = this.mediaOwner;
+  #requireBrowserRevocation(owner, token) {
+    if (owner !== this.mediaOwner || this.disposed)
+      throw failure('MEDIA_OWNER_CHANGED', 'The browser credential belongs to a different media owner');
     if (!this.browserTokens.has(token))
       throw failure('BROWSER_TOKEN_UNOWNED', 'Only this media session may revoke its observed browser credentials');
     if (this.protectedNativeTokens.has(token))
       throw failure('NATIVE_TOKEN_OWNED', 'The native owner must revoke its own USG credential');
+    if (!owner.retired) return null;
+    const closed = this.#closedBrowserRevocation;
+    if (!closed || closed.owner !== owner || closed.origin !== owner.origin || closed.partition !== owner.partition ||
+        closed.tokens !== this.browserTokens || !closed.window.isDestroyed() ||
+        (this.window && !this.window.isDestroyed()) || !this.loggingOut || !this.retiring)
+      throw failure('MEDIA_OWNER_CHANGED', 'The quarantined browser credential requires cleanup after confirmed window closure');
+    return closed;
+  }
+
+  async #browserRevocationSession(owner, token) {
+    const closed = this.#requireBrowserRevocation(owner, token);
+    if (!closed) return this.initializeSession();
+    if (!closed.ready) {
+      // Never reopen the retired page's partition or relax its request blocker.
+      // This ephemeral transport has no renderer, cookies or native credential;
+      // only the fixed main-process token DELETE below can use it.
+      const session = this.electron.session.fromPartition(owner.partition + '-revocation-' + crypto.randomBytes(16).toString('hex'));
+      closed.session = session;
+      closed.ready = Promise.resolve().then(async () => {
+        if (this.options.proxyRules) await session.setProxy({ proxyRules: this.options.proxyRules });
+        return session;
+      });
+    }
+    return closed.ready;
+  }
+
+  async revokeBrowserCredential(token) {
+    const owner = this.mediaOwner;
+    this.#requireBrowserRevocation(owner, token);
     if (this.confirmedBrowserLogouts.has(token)) return;
     const pending = [...this.pendingBrowserLogouts.values()].filter(item => item.token === token);
     if (pending.length) await Promise.all(pending.map(item => item.promise));
-    this.requireMediaOwner(owner);
+    this.#requireBrowserRevocation(owner, token);
     if (this.confirmedBrowserLogouts.has(token)) return;
     const observed = this.failedBrowserLogouts.get(token);
     if (observed) {
@@ -1748,6 +1784,19 @@ class MeetingNativeWeb extends EventEmitter {
           cleanup[name] = cleared.ok ? 'cleared' : 'failed';
         }));
       }
+      const revocation = this.#closedBrowserRevocation;
+      if (revocation?.ready) await run('browser-revocation-session-ready', () => revocation.ready);
+      if (revocation?.session) {
+        const session = revocation.session;
+        await Promise.all([['revocationStorage', 'clearStorageData'], ['revocationCache', 'clearCache'],
+          ['revocationAuthCache', 'clearAuthCache'], ['revocationConnections', 'closeAllConnections']]
+          .map(async ([name, method]) => {
+            const cleared = await run(name + '-cleanup', () => session[method]());
+            cleanup[name] = cleared.ok ? 'cleared' : 'failed';
+          }));
+        revocation.session = null;
+        revocation.ready = null;
+      }
       if (this.accountSessionReady) await run('account-session-ready', () => this.accountSessionReady);
       if (this.accountSession) {
         const session = this.accountSession;
@@ -1829,9 +1878,10 @@ class MeetingNativeWeb extends EventEmitter {
     if (this.disposed) throw failure('DISPOSED', 'The meeting bridge was disposed');
     const epoch = this.managementCancellationEpoch;
     if (owner) {
-      this.requireMediaOwner(owner);
-      if (method !== 'DELETE' || servicePath !== TOKEN_PATH || accessTokenHeader || !this.browserTokens.has(token))
-        throw failure('BROWSER_TOKEN_UNOWNED', 'Browser credentials may only be revoked at their owning site');
+      if (method !== 'DELETE' || servicePath !== TOKEN_PATH || accessTokenHeader || body !== undefined ||
+          headers !== undefined || !query || query.timeout !== false || Object.keys(query).length !== 1)
+        throw failure('BROWSER_TOKEN_UNOWNED', 'Browser credentials may only perform their fixed token revocation');
+      this.#requireBrowserRevocation(owner, token);
     } else if (this.retiring || this.loggingOut) {
       throw failure('MANAGEMENT_REQUEST_ABORTED', 'The account HTTP request belongs to a retiring owner');
     }
@@ -1872,8 +1922,12 @@ class MeetingNativeWeb extends EventEmitter {
       throw failure('NATIVE_TOKEN_OWNED', 'The native owner must revoke its own USG credential');
     serviceHeaders['X-Auth-Token'] = token;
     if (accessTokenHeader) serviceHeaders['X-Access-Token'] = token; // Portal module 19.
-    const session = await (owner ? this.initializeSession() : this.initializeAccountSession());
-    if (owner) this.requireMediaOwner(owner);
+    const session = await (owner ? this.#browserRevocationSession(owner, token) : this.initializeAccountSession());
+    if (owner) {
+      const closed = this.#requireBrowserRevocation(owner, token);
+      if (closed && closed.session !== session)
+        throw failure('MEDIA_OWNER_CHANGED', 'The browser revocation transport belongs to the retired document');
+    }
     else if (epoch !== this.managementCancellationEpoch || this.disposed || this.retiring || this.loggingOut)
       throw failure('MANAGEMENT_REQUEST_ABORTED', 'The account HTTP request was retired before dispatch');
     if (owner && this.protectedNativeTokens.has(token))
@@ -1892,8 +1946,13 @@ class MeetingNativeWeb extends EventEmitter {
         settled = true;
         clearTimeout(timer);
         if (!owner) this.accountRequests.delete(request);
-        if (!error && (owner ? owner !== this.mediaOwner || owner.retired :
-            epoch !== this.managementCancellationEpoch || this.disposed || this.retiring || this.loggingOut))
+        if (!error && owner) {
+          try {
+            const closed = this.#requireBrowserRevocation(owner, token);
+            if (closed && closed.session !== session)
+              throw failure('MEDIA_OWNER_CHANGED', 'The browser revocation transport was retired');
+          } catch (cause) { error = cause; }
+        } else if (!error && (epoch !== this.managementCancellationEpoch || this.disposed || this.retiring || this.loggingOut))
           error = failure('SERVICE_ABORTED', 'The service reply belongs to a retired owner');
         error ? reject(error) : resolve(result);
       };

@@ -153,11 +153,11 @@ static gboolean zip_read_at(int fd, void *buffer, size_t length, uint64_t offset
 
 struct zip_directory {
     uint64_t entries;
-    gboolean seekable;
+    uint64_t end_offset;
 };
 
 static gboolean zip_check_directory(int fd, const unsigned char *end, uint64_t end_offset,
-                                    uint64_t file_size, struct zip_directory *directory)
+                                    struct zip_directory *directory)
 {
     uint64_t entries = zip_u16(end + 10), size = zip_u32(end + 12), offset = zip_u32(end + 16);
     uint64_t directory_end = end_offset, zip64_size = 0;
@@ -200,6 +200,13 @@ static gboolean zip_check_directory(int fd, const unsigned char *end, uint64_t e
         if (directory_end - cursor < sizeof header ||
             !zip_read_at(fd, header, sizeof header, cursor) ||
             memcmp(header, "PK\001\002", 4)) return FALSE;
+        if (header[5] == 3) { /* Unix creator: high attributes contain st_mode. */
+            uint32_t type = (zip_u32(header + 38) >> 16) & AE_IFMT;
+            /* libarchive normalizes FIFOs to regular files for an Info-Zip
+             * workaround. Our file-only ABI must reject declared special files
+             * before that conversion, but retain zero/permission-only modes. */
+            if (type && type != AE_IFREG && type != AE_IFDIR) return FALSE;
+        }
         uint64_t length = sizeof header + (uint64_t)zip_u16(header + 28) +
             zip_u16(header + 30) + zip_u16(header + 32);
         if (length > directory_end - cursor) return FALSE;
@@ -213,12 +220,7 @@ static gboolean zip_check_directory(int fd, const unsigned char *end, uint64_t e
             directory_end - cursor != sizeof signature + (uint64_t)zip_u16(signature + 4)) return FALSE;
     }
     directory->entries = entries;
-    /* 3.7.4's seekable bidder searches only the final 16 KiB and excludes its
-     * first byte. Use streaming only after validating the whole directory for
-     * the valid empty/long-comment/extended-ZIP64 cases that bidder cannot see. */
-    uint64_t tail_start = file_size > 16384 ? file_size - 16384 : 0;
-    directory->seekable = end_offset > tail_start &&
-        (!zip64 || (end_offset - tail_start >= sizeof locator && zip64_size <= 16384));
+    directory->end_offset = end_offset;
     return TRUE;
 }
 
@@ -233,10 +235,77 @@ static gboolean zip_read_directory(int fd, struct zip_directory *directory)
     for (size_t offset = length - 22;; --offset) {
         if (!memcmp(tail + offset, "PK\005\006", 4) &&
             length - offset - 22 == zip_u16(tail + offset + 20) &&
-            zip_check_directory(fd, tail + offset, start + offset, (uint64_t)st.st_size, directory)) return TRUE;
+            zip_check_directory(fd, tail + offset, start + offset, directory)) return TRUE;
         if (!offset) break;
     }
     return FALSE;
+}
+
+/* Keep the archive's central-directory semantics even when its comment is
+ * outside libarchive 3.7.4's 16 KiB EOCD search. This read-only logical view
+ * omits only the already validated archive comment and clears its length;
+ * central records, file types, encryption metadata and payloads are unchanged. */
+struct zip_source {
+    int fd;
+    uint64_t offset, size;
+    unsigned char buffer[65536];
+};
+
+static la_ssize_t zip_source_read(struct archive *archive, void *data, const void **buffer)
+{
+    struct zip_source *source = data;
+    *buffer = source->buffer;
+    uint64_t remaining = source->size - source->offset;
+    size_t length = remaining > sizeof source->buffer ? sizeof source->buffer : (size_t)remaining;
+    if (!length) return 0;
+    if (!zip_read_at(source->fd, source->buffer, length, source->offset)) {
+        archive_set_error(archive, EIO, "Cannot read ZIP input");
+        return -1;
+    }
+    uint64_t comment_length_offset = source->size - 2;
+    if (source->offset + length > comment_length_offset) {
+        size_t begin = source->offset < comment_length_offset ?
+            (size_t)(comment_length_offset - source->offset) : 0;
+        memset(source->buffer + begin, 0, length - begin);
+    }
+    source->offset += length;
+    return (la_ssize_t)length;
+}
+
+static la_int64_t zip_source_seek(struct archive *archive, void *data, la_int64_t offset, int whence)
+{
+    struct zip_source *source = data;
+    la_int64_t base;
+    switch (whence) {
+    case SEEK_SET: base = 0; break;
+    case SEEK_CUR: base = (la_int64_t)source->offset; break;
+    case SEEK_END: base = (la_int64_t)source->size; break;
+    default: archive_set_error(archive, EINVAL, "Invalid ZIP seek origin"); return ARCHIVE_FATAL;
+    }
+    if (offset < -base || offset > (la_int64_t)source->size - base) {
+        archive_set_error(archive, EINVAL, "ZIP seek outside input");
+        return ARCHIVE_FATAL;
+    }
+    source->offset = (uint64_t)(base + offset);
+    return (la_int64_t)source->offset;
+}
+
+static la_int64_t zip_source_skip(struct archive *archive, void *data, la_int64_t request)
+{
+    (void)archive;
+    struct zip_source *source = data;
+    if (request <= 0) return 0;
+    uint64_t remaining = source->size - source->offset;
+    uint64_t skip = (uint64_t)request > remaining ? remaining : (uint64_t)request;
+    source->offset += skip;
+    return (la_int64_t)skip;
+}
+
+static int zip_source_close(struct archive *archive, void *data)
+{
+    (void)archive;
+    g_free(data);
+    return ARCHIVE_OK;
 }
 
 static struct archive *zip_open_reader(const char *path, const char *password, int *fd, uint64_t *entries)
@@ -247,19 +316,35 @@ static struct archive *zip_open_reader(const char *path, const char *password, i
     if (!zip_read_directory(input, &directory)) { close(input); return NULL; }
     struct archive *archive = archive_read_new();
     if (!archive) { close(input); return NULL; }
-    if (directory.seekable) archive_read_support_format_zip_seekable(archive);
-    else archive_read_support_format_zip_streamable(archive);
+    /* Only a genuinely empty EOCD at offset zero needs the streaming reader;
+     * every archive containing entries must retain central-directory types. */
+    if (!directory.end_offset && !directory.entries) archive_read_support_format_zip_streamable(archive);
+    else archive_read_support_format_zip_seekable(archive);
     if (*password && archive_read_add_passphrase(archive, password) != ARCHIVE_OK) {
         archive_read_free(archive);
         close(input);
         return NULL;
     }
-    if (archive_read_open_fd(archive, input, 65536) != ARCHIVE_OK) {
+    struct zip_source *source = g_try_new(struct zip_source, 1);
+    if (!source) {
         archive_read_free(archive);
         close(input);
         return NULL;
     }
-    /* archive_read_open_fd borrows the descriptor; zip_close owns its close. */
+    source->fd = input;
+    source->offset = 0;
+    source->size = directory.end_offset + 22;
+    archive_read_set_callback_data(archive, source);
+    archive_read_set_read_callback(archive, zip_source_read);
+    archive_read_set_seek_callback(archive, zip_source_seek);
+    archive_read_set_skip_callback(archive, zip_source_skip);
+    archive_read_set_close_callback(archive, zip_source_close);
+    if (archive_read_open1(archive) != ARCHIVE_OK) {
+        archive_read_free(archive);
+        close(input);
+        return NULL;
+    }
+    /* The callbacks borrow the descriptor; zip_close owns its close. */
     *fd = input;
     *entries = directory.entries;
     return archive;

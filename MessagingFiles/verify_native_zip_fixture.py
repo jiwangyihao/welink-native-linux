@@ -187,11 +187,75 @@ def create_fixtures(root):
         assert archive.read("messages.jsonl") == first.encode()
         assert archive.testzip() is None
     valid.append({"file": prefixed, "streams": [first]})
-    with zipfile.ZipFile(fixtures / "unsupported-link.zip", "w") as archive:
-        link = zipfile.ZipInfo("link")
-        link.create_system = 3
-        link.external_attr = (stat.S_IFLNK | 0o777) << 16
-        archive.writestr(link, "../not-a-regular-file")
+    for name, file_type, content in (
+        ("unsupported-link.zip", stat.S_IFLNK, "../not-a-regular-file"),
+        ("unsupported-link-long-comment.zip", stat.S_IFLNK, "../not-a-regular-file"),
+        ("unsupported-fifo.zip", stat.S_IFIFO, ""),
+        ("unsupported-fifo-long-comment.zip", stat.S_IFIFO, ""),
+        ("unsupported-character-long-comment.zip", stat.S_IFCHR, ""),
+        ("unsupported-block-long-comment.zip", stat.S_IFBLK, ""),
+        ("unsupported-socket-long-comment.zip", stat.S_IFSOCK, ""),
+    ):
+        with zipfile.ZipFile(fixtures / name, "w") as archive:
+            if name.endswith("-long-comment.zip"):
+                archive.comment = b"x" * 65535
+            entry = zipfile.ZipInfo("link")
+            entry.create_system = 3
+            entry.external_attr = (file_type | 0o777) << 16
+            archive.writestr(entry, content)
+    zip64_link, _ = zip64_archive((fixtures / "unsupported-link-long-comment.zip").read_bytes())
+    (fixtures / "unsupported-link-zip64-long-comment.zip").write_bytes(zip64_link)
+
+    # The local filename alone says "regular file"; only the central Unix mode
+    # identifies this trailing directory. Long comments must not change its type.
+    central_types = "central-types-long-comment.zip"
+    with zipfile.ZipFile(fixtures / central_types, "w") as archive:
+        archive.comment = b"x" * 65535
+        archive.writestr("messages.jsonl", first)
+        directory = zipfile.ZipInfo("directory-without-slash")
+        directory.create_system = 3
+        directory.external_attr = (stat.S_IFDIR | 0o755) << 16
+        archive.writestr(directory, "")
+    with zipfile.ZipFile(fixtures / central_types) as archive:
+        assert stat.S_ISDIR(archive.getinfo("directory-without-slash").external_attr >> 16)
+        assert archive.read("messages.jsonl") == first.encode()
+        assert archive.testzip() is None
+    valid.append({"file": central_types, "streams": [first]})
+
+    legacy_modes = "legacy-modes-long-comment.zip"
+    legacy_entries = (
+        ("unix-zero-mode.jsonl", 3, 0x20, first),
+        ("unix-permissions.jsonl", 3, 0o600 << 16, second),
+        ("unix-regular.jsonl", 3, (stat.S_IFREG | 0o600) << 16, first),
+        ("unix-legacy-directory/", 3, 0o700 << 16, ""),
+        ("dos-regular.jsonl", 0, ((stat.S_IFIFO | 0o600) << 16) | 0x20, second),
+        ("dos-directory", 0, ((stat.S_IFIFO | 0o700) << 16) | 0x10, ""),
+        ("legacy-os.jsonl", 10, ((stat.S_IFIFO | 0o600) << 16) | 0x20, first),
+    )
+    with zipfile.ZipFile(fixtures / legacy_modes, "w") as archive:
+        archive.comment = b"x" * 65535
+        for name, creator, attributes, content in legacy_entries:
+            entry = zipfile.ZipInfo(name)
+            entry.create_system = creator
+            entry.external_attr = attributes
+            archive.writestr(entry, content)
+    # ZipFile supplies default permissions for an entirely zero attribute word.
+    # Clear the first central record's attributes explicitly to retain that case.
+    legacy_data = bytearray((fixtures / legacy_modes).read_bytes())
+    end_offset = len(legacy_data) - 65535 - 22
+    central_offset = struct.unpack_from("<I", legacy_data, end_offset + 16)[0]
+    struct.pack_into("<I", legacy_data, central_offset + 38, 0)
+    (fixtures / legacy_modes).write_bytes(legacy_data)
+    with zipfile.ZipFile(fixtures / legacy_modes) as archive:
+        assert archive.getinfo("unix-zero-mode.jsonl").external_attr == 0
+        assert archive.testzip() is None
+    legacy_streams = [first, second, first, second, first]
+    valid.append({"file": legacy_modes, "streams": legacy_streams})
+    legacy_zip64, _ = zip64_archive(bytes(legacy_data))
+    (fixtures / "legacy-modes-zip64-long-comment.zip").write_bytes(legacy_zip64)
+    with zipfile.ZipFile(fixtures / "legacy-modes-zip64-long-comment.zip") as archive:
+        assert archive.testzip() is None
+    valid.append({"file": "legacy-modes-zip64-long-comment.zip", "streams": legacy_streams})
 
     password = "synthetic-native-zip-password"
     (fixtures / "protected.jsonl").write_text(first, encoding="utf-8")
@@ -222,7 +286,13 @@ def create_fixtures(root):
     assert source_stat.st_blocks * 512 < CHUNK_SIZE, "TMPDIR does not support sparse fixtures"
     return {
         "valid": valid,
-        "damaged": ["bad-crc.zip", "truncated-payload.zip", "truncated-empty.zip", "unsupported-link.zip"] + end_damage + directory_damage,
+        "damaged": [
+            "bad-crc.zip", "truncated-payload.zip", "truncated-empty.zip", "unsupported-link.zip",
+            "unsupported-link-long-comment.zip", "unsupported-fifo-long-comment.zip",
+            "unsupported-fifo.zip", "unsupported-character-long-comment.zip",
+            "unsupported-block-long-comment.zip", "unsupported-socket-long-comment.zip",
+            "unsupported-link-zip64-long-comment.zip",
+        ] + end_damage + directory_damage,
         "password": password,
         "passwordStream": first,
         "largeSize": LARGE_SIZE,
