@@ -49,6 +49,8 @@ def link_target(name, value):
 def public_literal(name):
     if name in ELECTRON or (name.startswith("locales/") and name.endswith(".pak")):
         return True
+    if name.startswith("resources/app/native/vendor/management/"):
+        return True  # Hash-locked ws/proxy dependencies with original open-source notices.
     return (name.startswith("resources/app/native/") and
             not name.startswith("resources/app/native/vendor/")) or name.startswith(
                 "resources/app/libraries/node_extends/node-ffi/") or name == (
@@ -91,7 +93,7 @@ def create(image, inputs, output, source_commit):
             item["source"] = "sandbox"
             shutil.copyfile(source, output / "chrome-sandbox")
             (output / "chrome-sandbox").chmod(0o755)
-        elif name.startswith("resources/app/native/vendor/"):
+        elif name.startswith("resources/app/native/vendor/") and not public_literal(name):
             origin = name.removeprefix("resources/app/native/vendor/")
             base = inputs / "providers" / relative(origin)
             if not base.is_file() or base.is_symlink() or digest(base) != item["sha256"]:

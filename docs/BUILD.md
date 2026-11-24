@@ -32,7 +32,7 @@ it does not compile on the end user's machine or require an existing native rele
 python3 Packaging/build_deb.py \
   --image "$BUILD/image" --inputs "$BUILD/image-inputs" \
   --source-commit "$SOURCE_COMMIT" --output "$OUT"
-# Run on a build machine with APM and its amber-pm-bookworm base installed:
+# Run on a build machine with APM and its amber-pm-trixie base installed:
 bash Packaging/build_apm.sh \
   --deb "$OUT/cn.edu.hit.welink.native_45.14-1_amd64.deb" --output "$OUT"
 ```

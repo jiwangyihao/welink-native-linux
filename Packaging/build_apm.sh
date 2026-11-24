@@ -5,12 +5,12 @@
 set -euo pipefail
 usage() {
     printf '%s\n' 'Usage: build_apm.sh --deb PATH --output DIRECTORY [--base NAME]' \
-        'Default base: amber-pm-bookworm (installed Debian 12 base, glibc 2.36).' \
+        'Default base: amber-pm-trixie (installed Debian 13 base, glibc 2.41).' \
         'The converter installs libc6-i386 from the DEB dependencies into the app layer.' \
         'No application or user profile is launched/modified by this build.'
 }
 fail() { printf 'build_apm: %s\n' "$*" >&2; exit 1; }
-deb= output= base=amber-pm-bookworm
+deb= output= base=amber-pm-trixie
 while (($#)); do
     case "$1" in
         --deb|--output|--base)
@@ -33,10 +33,11 @@ native_version=$(dpkg-deb -f "$deb" Version)
 [[ $(dpkg-deb -f "$deb" Package) == cn.edu.hit.welink.native &&
    $native_version =~ ^45\.(0|[1-9][0-9]*)-1$ &&
    $(dpkg-deb -f "$deb" Architecture) == amd64 ]] || fail 'Expected a versioned cn.edu.hit.welink.native amd64 package'
+minimum_glibc=$(dpkg-deb -f "$deb" Depends | python3 -c 'import re,sys; m=re.search(r"\blibc6-i386\s*\(\s*>=\s*([0-9]+(?:\.[0-9]+)+)\s*\)",sys.stdin.read()); m or sys.exit("Missing declared ia32 glibc minimum"); print(m.group(1))')
 base_root=/var/lib/apm/apm/files/ace-env/var/lib/apm/$base/files/ace-env
 [[ -d $base_root && -f $base_root/var/lib/dpkg/status ]] || fail "Install the complete APM base with: apm install $base"
 glibc=$(dpkg-query --admindir="$base_root/var/lib/dpkg" -W -f='${Version}' libc6:amd64)
-dpkg --compare-versions "$glibc" ge 2.34 || fail "The selected base glibc $glibc is older than 2.34"
+dpkg --compare-versions "$glibc" ge "$minimum_glibc" || fail "The selected base glibc $glibc is older than required $minimum_glibc"
 mkdir -p -- "$output"
 output=$(realpath -e -- "$output")
 package=cn.edu.hit.welink.native.apm
@@ -62,8 +63,8 @@ for name in ('package_install.py', 'seed.py', 'chrome-sandbox', 'tools/install_d
     if not (files / name).is_file() or (files / name).is_symlink():
         raise SystemExit('Missing regular bootstrap component: ' + name)
 control = (root / 'DEBIAN/control').read_text()
-if not re.search(r'\blibc6-i386\s*\(\s*>=\s*2\.34\s*\)', control):
-    raise SystemExit('The DEB must declare libc6-i386 (>= 2.34) so the converter installs the ia32 loader')
+if not re.search(r'\blibc6-i386\s*\(\s*>=\s*[0-9]+(?:\.[0-9]+)+\s*\)', control):
+    raise SystemExit('The DEB must declare its libc6-i386 minimum so the converter installs the ia32 loader')
 shutil.copyfile(launcher, files / 'bin/launch')
 (files / 'bin/launch').chmod(0o755)
 (files / 'bin/setup').write_text('#!/bin/bash\nset -euo pipefail\nexec /opt/apps/cn.edu.hit.welink.native/files/bin/launch --no-launch "$@"\n')

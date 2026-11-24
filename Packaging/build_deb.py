@@ -16,7 +16,7 @@ import seed
 
 PACKAGE = "cn.edu.hit.welink.native"
 APPROOT = Path("opt/apps") / PACKAGE
-DEPENDENCIES = ("bash, python3 (>= 3.11), libc6-i386 (>= 2.34), innoextract (>= 1.9), "
+DEPENDENCIES = ("bash, python3 (>= 3.11), libc6-i386 (>= 2.41), innoextract (>= 1.9), "
                 "ca-certificates, zenity, x11-utils, xdg-utils, wmctrl, libglib2.0-bin, "
                 "pkexec, sudo, dbus-user-session, coreutils, desktop-file-utils, util-linux")
 LAUNCH = '''#!/bin/bash

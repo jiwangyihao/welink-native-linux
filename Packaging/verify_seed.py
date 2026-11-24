@@ -30,6 +30,7 @@ class SeedTests(unittest.TestCase):
         self.put(self.image / "resources/app/native/build.json", json.dumps({"build": "hit-native-linux-ia32-r45.14"}).encode())
         self.put(self.image / "resources/app/native/launch-welink", b"#!/bin/sh\nexit 0\n", 0o755)
         self.put(self.image / "resources/app/native/lib/fixture.so", b"first-party fixture bytes")
+        self.put(self.image / "resources/app/native/vendor/management/node_modules/agent-base/LICENSE", b"MIT license fixture")
         self.put(self.image / "chrome-sandbox", b"sandbox fixture", 0o755)
         (self.image / "launch-welink").symlink_to("resources/app/native/launch-welink")
         self.output = self.root / "package"
@@ -58,6 +59,7 @@ class SeedTests(unittest.TestCase):
         self.assertEqual((installed / "resources/app/pedestal/code.js").read_bytes(), self.target)
         self.assertEqual((installed / "resources/app/native/vendor/provider.js").read_bytes(), b"private provider fixture")
         self.assertEqual((installed / "resources/app/native/lib/fixture.so").read_bytes(), b"first-party fixture bytes")
+        self.assertEqual((installed / "resources/app/native/vendor/management/node_modules/agent-base/LICENSE").read_bytes(), b"MIT license fixture")
         self.assertTrue(os.access(installed / "launch-welink", os.X_OK))
         self.assertEqual((installed / "launch-welink").readlink(), Path("resources/app/native/launch-welink"))
 
