@@ -1137,10 +1137,12 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
   };
   app.on('session-created', gateSession);
   await app.whenReady();
+  await electron.netLog.startLogging(path.join(process.env.WELINK_TEST_OUTPUT || root, 'recovery-netlog.json'));
   gateSession(electron.session.defaultSession);
   const disposeBroker = require(path.join(appRoot, 'native/meeting_main.js')).installMeetingMain({ electron, appRoot });
   ipcMain.handle(CONTROL, async (event, request) => {
     assert.ok(service && event.sender === service.webContents && event.senderFrame === event.sender.mainFrame);
+    console.log('RECOVERY_CONTROL', activeMode, request.action, Date.now());
     if (['arm-media-loss', 'media-request-held', 'media-cleanup-held', 'lose-media-document',
       'media-owners', 'release-media-request', 'release-media-cleanup', 'failed-media-authority',
       'close-failed-media-document'].includes(request.action)) {
@@ -1302,6 +1304,7 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
   try {
     for (const mode of modes) {
       activeMode = mode;
+      console.log('RECOVERY_MODE', mode, Date.now());
       service = new BrowserWindow({ show: false, webPreferences: {
         nodeIntegration: true, contextIsolation: false, sandbox: false,
         partition: 'welink-meeting-lifetime-' + mode + '-' + path.basename(root)
@@ -1390,5 +1393,6 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
     await disposeBroker();
     for (const socket of sockets) socket.destroy();
     await new Promise(resolve => provider.close(resolve));
+    await electron.netLog.stopLogging();
   }
 })().then(() => app.exit(0), error => { console.error(error.stack || error); app.exit(1); });
