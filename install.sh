@@ -23,6 +23,7 @@ selected package manager. Nothing is installed to satisfy prerequisites.
 Run installation as your desktop user, never with sudo/root; only the package
 manager is elevated. Root may use --help or --verify-only, not installation.
 Downloads use a private directory under trusted /tmp; TMPDIR is ignored.
+APM installation stages the verified package privately beneath /home and cleans it up.
 No application is launched and no user profile is downloaded or changed here.
 USAGE
 }
@@ -70,7 +71,7 @@ require_command() {
         exit 127
     fi
 }
-for program in curl python3 openssl dpkg uname mktemp rm cat; do
+for program in curl python3 openssl dpkg uname mktemp rm mv cat; do
     require_command "$program"
 done
 system=$(uname -s)
@@ -86,15 +87,16 @@ fi
 
 umask 077
 work_dir=''
+apm_dir=''
 cleanup() {
-    local status=$?
+    local status=$? directory
     trap - EXIT
-    if [[ -n $work_dir ]]; then
-        if ! rm -rf -- "$work_dir"; then
-            printf 'Error: Could not remove temporary directory: %s\n' "$work_dir" >&2
+    for directory in "$apm_dir" "$work_dir"; do
+        if [[ -n $directory ]] && ! rm -rf -- "$directory"; then
+            printf 'Error: Could not remove temporary directory: %s\n' "$directory" >&2
             if (( status == 0 )); then status=1; fi
         fi
-    fi
+    done
     exit "$status"
 }
 trap cleanup EXIT
@@ -252,6 +254,34 @@ printf 'Authenticated %s (%s bytes, SHA256 %s).\n' "$asset" "$size" "$sha256"
 if (( verify_only )); then
     printf 'Verification complete; no package manager was invoked. Temporary downloads will be removed.\n'
     exit 0
+fi
+if [[ $kind == apm ]]; then
+    # APM mounts /home, not the host's /tmp. Keep all verification in trusted
+    # /tmp, then move only the authenticated package to a protected visible path.
+    apm_dir=$(python3 -I - <<'PY'
+import os
+from pathlib import Path
+import stat
+import sys
+import tempfile
+
+home = Path(os.environ.get("HOME", ""))
+uid = os.getuid()
+if not home.is_absolute() or not home.is_relative_to("/home") or home.resolve() != home:
+    sys.exit("Error: APM installation requires a canonical HOME beneath /home.")
+if home.stat().st_uid != uid:
+    sys.exit("Error: APM staging HOME must belong to the installing user.")
+for directory in (home, *home.parents):
+    info = os.lstat(directory)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, uid):
+        sys.exit("Error: Unsafe APM staging parent: " + str(directory))
+    if info.st_mode & 0o022 and not (info.st_uid == 0 and info.st_mode & stat.S_ISVTX):
+        sys.exit("Error: Writable APM staging parent: " + str(directory))
+print(tempfile.mkdtemp(prefix=".welink-native-install.", dir=home))
+PY
+    )
+    mv -- "$package_path" "$apm_dir/$asset"
+    package_path="$apm_dir/$asset"
 fi
 printf 'Installing the authenticated package with sudo %s install...\n' "$manager"
 sudo -- "$manager" install "$package_path"
