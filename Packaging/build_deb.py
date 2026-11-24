@@ -48,6 +48,7 @@ def link(root, relative, target):
 
 
 def build(args):
+    os.umask(0o022)
     args.output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".welink-deb-", dir=args.output) as temporary:
         tree = Path(temporary) / "package"
