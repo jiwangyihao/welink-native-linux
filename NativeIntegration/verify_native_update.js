@@ -114,11 +114,12 @@ function loadNative(name, overrides) {
 }
 const platform = loadNative('platform.js', { electron: { ipcRenderer } });
 const native = loadNative('update_renderer.js', { './platform': platform });
-window.require = name => name === path.join(appRoot, 'native/update_renderer') ? native : require(name);
+const pageRequire = createRequire(path.join(appRoot, 'pedestal/index.html'));
+window.require = name => pageRequire.resolve(name) === path.join(appRoot, 'native/update_renderer.js') ? native : pageRequire(name);
 window.window = window;
 window.global = window;
 window.process = { platform: 'linux', resourcesPath: path.dirname(appRoot) };
-window.Pedestal = { appRootPath: path.join(temp, 'profile-appdata') };
+window.Pedestal = { appRootPath: path.join(temp, 'profile-appdata'), logRootPath: path.join(temp, 'logs'), viewID: 'pedestal' };
 window.console = { error: (...args) => errors.push(args) };
 window.coreLogger = { getLogger: () => () => ({ info() {}, error() {}, debug() {} }) };
 window.coreCommon = {
@@ -129,6 +130,7 @@ const consumerContext = vm.createContext(window);
 vm.runInContext('Object.type = { isFunction: value => typeof value === "function" };', consumerContext);
 vm.runInContext(fs.readFileSync(path.join(appRoot, 'pedestal/js/HwUpgrade.js'), 'utf8'), consumerContext, { timeout: 10000 });
 assert.equal(typeof window.coreUpgrade.checkUpgrade, 'function', 'The real vendor consumer must initialize');
+vm.runInContext(fs.readFileSync(path.join(appRoot, 'libraries/js/httpWithRsSdk.js'), 'utf8'), consumerContext, { timeout: 10000 });
 
 const sources = new Map();
 function visit(node, callback) {
@@ -287,8 +289,7 @@ async function run() {
   for (const name of ['downloadUpgradeFile', 'cancelDownloadUpgradeFile']) {
     const property = expression('libraries/js/httpWithRsSdk.js', node => node.type === 'Property' && node.key.name === name && node.value.type === 'ConditionalExpression');
     const value = property.slice(property.indexOf(':') + 1);
-    const fn = evaluate(value, { require: name => { assert.equal(name, '../../native/update_renderer'); return native; } });
-    await assert.rejects(fn({ versionDownloadUrl: 'https://example.invalid/WindowsPackage.exe' }), { code: 'ENOTSUP' });
+    await assert.rejects(window.coreRsHttp[name]({ versionDownloadUrl: 'https://example.invalid/WindowsPackage.exe' }), { code: 'ENOTSUP' });
     for (const platformName of ['win32', 'darwin']) {
       const original = () => 'original-' + name;
       assert.equal(evaluate(value, { process: { platform: platformName }, U: original, H: original })(), 'original-' + name);

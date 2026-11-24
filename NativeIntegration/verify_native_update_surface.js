@@ -3,7 +3,7 @@
 
 // Parent-only genuine surface scenario, on an isolated desktop/profile:
 // launch the assembled application with --remote-debugging-port=19249, then
-// node verify_native_update_surface.js --port 19249 --expect current --version r45.10
+// node verify_native_update_surface.js --port 19249 --expect current --version r45.11
 // The verifier invokes the REAL vendor manual-check consumer. Inspect/capture
 // the real native dialog, then dismiss it using its Close button. It neither
 // supplies a release fixture nor clicks/open-installs anything. Re-run with the
@@ -77,12 +77,16 @@ async function main() {
         if (Date.now() >= deadline) throw new Error("The real upgrade consumer did not initialize");
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      return {platform:process.platform,electron:process.versions.electron,consumer:typeof window.coreUpgrade.checkUpgrade};
+      const httpDownload = await window.coreRsHttp.downloadUpgradeFile({versionDownloadUrl:"https://example.invalid/WindowsPackage.exe"}).then(
+        () => { throw new Error("The real shared HTTP SDK attempted a Windows update"); },
+        error => { if (error.code !== "ENOTSUP") throw error; return error.code; });
+      return {platform:process.platform,electron:process.versions.electron,consumer:typeof window.coreUpgrade.checkUpgrade,httpDownload,route:location.hash};
     })()`, awaitPromise: true, returnByValue: true });
     assert(!identity.exceptionDetails, JSON.stringify(identity.exceptionDetails));
     assert.equal(identity.result.value.platform, 'linux');
     assert.match(identity.result.value.electron, /^22\./);
     assert.equal(identity.result.value.consumer, 'function');
+    assert.equal(identity.result.value.httpDownload, 'ENOTSUP');
     console.log('Invoking the live native update check. Inspect/capture the real dialog, then choose Close.');
     const evaluated = await send('Runtime.evaluate', {
       expression: 'window.coreUpgrade.checkUpgrade({entry:"native-release-surface-verification",isUserClick:true})', awaitPromise: true, returnByValue: true

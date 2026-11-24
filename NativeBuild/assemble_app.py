@@ -1273,8 +1273,8 @@ def install_native_updates(app):
         ),
         "libraries/js/httpWithRsSdk.js": (
             ("downloadUpgradeFile:U,cancelDownloadUpgradeFile:H,",
-             'downloadUpgradeFile:"linux"===process.platform?require("../../native/update_renderer").unsupportedAsync:U,'
-             'cancelDownloadUpgradeFile:"linux"===process.platform?require("../../native/update_renderer").unsupportedAsync:H,'),
+             f'downloadUpgradeFile:"linux"===process.platform?{native}.unsupportedAsync:U,'
+             f'cancelDownloadUpgradeFile:"linux"===process.platform?{native}.unsupportedAsync:H,'),
         ),
     }
     for relative in dict.fromkeys((*guards, *replacements)):

@@ -2,7 +2,7 @@
 
 This repository contains the native port and build recipes, **not the commercial client**. A clean checkout can acquire the public inputs, compile the real ia32 libraries/workers and FFI addons, and run the source-only smoke checks without an account, vendor files, browser session, or existing cache. Creating a usable application image is a separate, vendor-dependent procedure below.
 
-The release identity is `hit-native-linux-ia32-r45.10`. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
+The release identity is `hit-native-linux-ia32-r45.11`. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
 
 ## Host prerequisites
 
@@ -140,8 +140,8 @@ For assembly, the default repository-local SQLite source is required for notice 
 ROOT=$PWD
 VENDOR_APP=/absolute/path/to/trusted/resources/app
 ELECTRON_OUT=/absolute/path/to/custom-electron/src/out/ia32
-IMAGE="$ROOT/.work/image-r45.10"
-MANIFEST="$ROOT/.work/integrity-r45.10"
+IMAGE="$ROOT/.work/image-r45.11"
+MANIFEST="$ROOT/.work/integrity-r45.11"
 
 python3 NativeBuild/prepare_overrides.py \
   --vendor-app "$VENDOR_APP" --output NativeIntegration/app-overrides
@@ -158,7 +158,7 @@ python3 NativeBuild/assemble_app.py prepare \
   --native-libs "$ROOT/.work/native-libs" --deps-prefix "$WELINK_NATIVE_DEPS" \
   --electron-prefix "$ROOT/.inputs/electron-runtime/root" \
   --output "$IMAGE" --manifest-dir "$MANIFEST" \
-  --build-id hit-native-linux-ia32-r45.10 --native-license "$ROOT/LICENSE"
+  --build-id hit-native-linux-ia32-r45.11 --native-license "$ROOT/LICENSE"
 
 # Compile only the checker against exactly that baseline, then finalize it.
 WELINK_NATIVE_INTEGRITY_INCLUDE="$MANIFEST" \
