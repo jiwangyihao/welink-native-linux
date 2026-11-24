@@ -81,7 +81,12 @@ def activate():
             raise RuntimeError('Refusing an unrelated APM activation socket')
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(10)
-            connection.connect(str(filename))
+            # sun_path is bounded even when the private HOME is a valid long path.
+            socket_directory = os.open(state, directory_flags)
+            try:
+                connection.connect(f'/proc/self/fd/{socket_directory}/launch.sock')
+            finally:
+                os.close(socket_directory)
             _, uid, _ = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
             if uid != os.getuid():
                 raise RuntimeError('The APM activation server belongs to another user')
@@ -166,7 +171,11 @@ try:
         raise RuntimeError('The private APM overlay was not mounted')
     # User arguments cross ace-run's shell interpolation in a private JSON
     # file; the executable command is always this fixed package entry point.
-    result = subprocess.run([str(runtime), '/opt/apps/cn.edu.hit.welink.native/files/bin/launch'], env=environment)
+    # ACE supplies the package filesystem, but does not request PID isolation.
+    # Keep its loader inside explicit user/PID namespaces with a matching procfs.
+    result = subprocess.run(['/usr/bin/bwrap', '--unshare-user', '--unshare-pid',
+                             '--dev-bind', '/', '/', '--proc', '/proc', '--',
+                             str(runtime), '/opt/apps/cn.edu.hit.welink.native/files/bin/launch'], env=environment)
 finally:
     if os.path.ismount(merged):
         subprocess.run(['/usr/bin/fusermount3', '-u', str(merged)], check=True)
@@ -241,7 +250,11 @@ except BlockingIOError:
                     info = filename.lstat()
                     if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
                         raise ValueError('Refusing an unrelated APM activation socket')
-                    connection.connect(str(filename))
+                    socket_directory = os.open(state, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+                    try:
+                        connection.connect(f'/proc/self/fd/{socket_directory}/launch.sock')
+                    finally:
+                        os.close(socket_directory)
                 except OSError as error:
                     if error.errno not in (errno.ENOENT, errno.ECONNREFUSED) or time.monotonic() >= deadline:
                         raise
@@ -282,7 +295,11 @@ if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
     raise OSError(ctypes.get_errno(), 'Cannot supervise the Amber PM application lifetime')
 os.environ['WELINK_NATIVE_APM_SUPERVISOR_PID'] = str(os.getpid())
 server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-server.bind(str(filename))
+socket_directory = os.open(state, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+try:
+    server.bind(f'/proc/self/fd/{socket_directory}/launch.sock')
+finally:
+    os.close(socket_directory)
 os.chmod(filename, 0o600)
 socket_inode = filename.stat().st_ino
 server.listen(8)
