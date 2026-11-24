@@ -1709,6 +1709,16 @@ class MeetingNativeWeb extends EventEmitter {
       try { return { ok: true, value: await action() }; }
       catch (error) { errors.push(this.publicLogoutError(error, stage)); return { ok: false }; }
     };
+    let windowCleanupAttempted = null;
+    const closeWindow = async window => {
+      if (!window || window.isDestroyed() || window === windowCleanupAttempted) return;
+      windowCleanupAttempted = window;
+      const closed = await run('window-cleanup', () => {
+        window.destroy();
+        if (!window.isDestroyed()) throw failure('WINDOW_CLOSE_UNCONFIRMED', 'The meeting window did not close');
+      });
+      cleanup.window = closed.ok ? 'closed' : 'failed';
+    };
     this.loggingOut = true;
     this.cancelScreenStart();
     ++this.recordingCancellationEpoch;
@@ -1717,7 +1727,18 @@ class MeetingNativeWeb extends EventEmitter {
     try {
       if (this.offline?.active) await run('offline-retirement', () => this.offline.retire());
       if (this.mediaOwner.anonymous) await run('anonymous-voice-retirement', () => this.anonymousVoice.retire(this.mediaOwner));
-      await run('window-hide', () => this.hideMeetingWindow());
+      const quarantined = this.#closedBrowserRevocation;
+      const quarantinedWindow = this.mediaOwner.retired && quarantined?.owner === this.mediaOwner &&
+        quarantined.window === this.window ? quarantined.window : null;
+      await run('window-hide', () => {
+        if (!quarantinedWindow) return this.hideMeetingWindow();
+        // Do not let hide's normal destroy fallback consume a second close
+        // attempt for this quarantined document. Its one close is owned below.
+        if (quarantinedWindow.isDestroyed()) return;
+        quarantinedWindow.hide();
+        if (!quarantinedWindow.isDestroyed() && quarantinedWindow.isVisible())
+          throw failure('WINDOW_HIDE_UNCONFIRMED', 'The meeting window did not become hidden');
+      });
       const voice = this.options.getVoiceSession?.();
       if (voice) await run('voice-stop', () => voice.filter.stop());
       if (screenStop) await run('screen-stop', () => screenStop);
@@ -1727,6 +1748,13 @@ class MeetingNativeWeb extends EventEmitter {
       }
       const files = await run('recording-output-cleanup', () => this.abortRecordingOutputs());
       cleanup.recordingFiles = files.ok ? 'cleared' : 'failed';
+      if (quarantinedWindow) {
+        // The failed page cannot supply a new inventory. Explicit cleanup must
+        // confirm its closure before using the known-token revocation authority.
+        // A refused close is not retried in finally: keep that owner's inventory
+        // for a later explicit cleanup rather than closing after skipping DELETEs.
+        await closeWindow(quarantinedWindow);
+      }
       const beforeLeave = await run('credentials-before-leave', () => this.readBrowserCredentials());
       if (!beforeLeave.ok) inventoryFailed = true;
       if (this.window && !this.window.isDestroyed() && this.ready) {
@@ -1762,14 +1790,7 @@ class MeetingNativeWeb extends EventEmitter {
     } finally {
       // Local cleanup is unconditional: network failure must not keep a logged-in
       // page or its isolated browser storage alive. It is not server confirmation.
-      const window = this.window;
-      if (window && !window.isDestroyed()) {
-        const closed = await run('window-cleanup', () => {
-          window.destroy();
-          if (!window.isDestroyed()) throw failure('WINDOW_CLOSE_UNCONFIRMED', 'The meeting window did not close');
-        });
-        cleanup.window = closed.ok ? 'closed' : 'failed';
-      }
+      await closeWindow(this.window);
       if (this.window && this.window.isDestroyed()) this.window = null;
       this.webToken = '';
       this.userInfo = null;

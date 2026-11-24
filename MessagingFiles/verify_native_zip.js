@@ -137,6 +137,28 @@ async function rejectArchive(filePath, password = '') {
 
     for (const fixture of fixtures.valid)
       await verifyIterator(path.join(root, 'fixtures', fixture.file), fixture.streams);
+    const originalFixture = fixtures.valid.find(fixture => fixture.file === 'trailing-directories.zip');
+    const replacementFixture = fixtures.valid.find(fixture => fixture.file === 'replacement-two-files.zip');
+    const activeZip = path.join(root, 'replace-active.zip');
+    const replacementZip = path.join(root, 'replace-next.zip');
+    fs.copyFileSync(path.join(root, 'fixtures', originalFixture.file), activeZip);
+    fs.copyFileSync(path.join(root, 'fixtures', replacementFixture.file), replacementZip);
+    const retainedOpen = await request(1, { file_path: activeZip });
+    assert.equal(retainedOpen.result, 0);
+    assert.equal(retainedOpen.param.total_num, 1);
+    // Both archives contain two entries, but only the original contains a
+    // directory. Replacing the pathname must not change this open iterator.
+    fs.renameSync(replacementZip, activeZip);
+    const retainedFile = await request(2, { file_path: activeZip });
+    assert.equal(retainedFile.result, 0);
+    assert.equal(retainedFile.param.file_stream, originalFixture.streams[0]);
+    assert.equal(retainedFile.param.total_num, 1);
+    assert.equal(retainedFile.param.cur_num, 1);
+    assert.equal(retainedFile.param.end_of_archive, false);
+    expectEof(await request(2, { file_path: activeZip }), activeZip, 1);
+    assert.equal((await request(3, { file_path: activeZip })).result, 0);
+    await verifyIterator(activeZip, replacementFixture.streams);
+    console.log('PASS native ZIP descriptor identity: original contents/count/EOF survive atomic replacement; reopening sees both new files');
     for (const file of fixtures.damaged)
       await rejectArchive(path.join(root, 'fixtures', file));
     const truncatedAfterOpen = path.join(root, 'fixtures', 'truncated-after-open.zip');
@@ -187,8 +209,13 @@ async function rejectArchive(filePath, password = '') {
       'JSON file_stream must retain its intentional INT_MAX bound');
     assert.equal((await request(2, { file_path: largeZip })).result, 1,
       'oversize JSON rejection must not become EOF success');
-    const peakRssKiB = process.resourceUsage().maxRSS;
-    assert.ok(peakRssKiB < 512 * 1024, 'native streaming exceeded the 512 MiB resident-memory budget');
+    // getrusage retains a launcher's pre-exec peak; Linux VmHWM measures this
+    // executable's actual resident high water, including all native operations.
+    const highWater = /^VmHWM:\s+(\d+) kB$/m.exec(fs.readFileSync('/proc/self/status', 'utf8'));
+    assert.ok(highWater, 'Linux process-local resident high water is required');
+    const peakRssKiB = Number(highWater[1]);
+    assert.ok(peakRssKiB < 512 * 1024,
+      'native streaming exceeded the 512 MiB resident-memory budget: ' + peakRssKiB + ' KiB');
     console.log('PASS native large-file streaming: full copied/archive bytes and CRC verified by bounded independent readers');
     console.log(JSON.stringify({
       passed: true, ...unicode, independentReader: true, fileOnlyCounts: true,

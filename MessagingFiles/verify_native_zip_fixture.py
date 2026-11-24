@@ -72,6 +72,7 @@ def create_fixtures(root):
             ("leading/", ""), ("messages-1.jsonl", first), ("between/", ""),
             ("messages-2.jsonl", second), ("trailing/", ""), ("trailing/nested/", ""),
         ],
+        "replacement-two-files.zip": [("messages-1.jsonl", second), ("messages-2.jsonl", first)],
         "empty.zip": [],
         "empty-comment.zip": [],
         "empty-max-comment.zip": [],

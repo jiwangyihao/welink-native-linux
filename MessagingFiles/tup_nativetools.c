@@ -308,27 +308,23 @@ static int zip_source_close(struct archive *archive, void *data)
     return ARCHIVE_OK;
 }
 
-static struct archive *zip_open_reader(const char *path, const char *password, int *fd, uint64_t *entries)
+static struct archive *zip_open_reader(int input, const char *password, uint64_t *entries)
 {
-    int input = open(path, O_RDONLY | O_CLOEXEC);
-    if (input < 0) return NULL;
     struct zip_directory directory;
-    if (!zip_read_directory(input, &directory)) { close(input); return NULL; }
+    if (!zip_read_directory(input, &directory)) return NULL;
     struct archive *archive = archive_read_new();
-    if (!archive) { close(input); return NULL; }
+    if (!archive) return NULL;
     /* Only a genuinely empty EOCD at offset zero needs the streaming reader;
      * every archive containing entries must retain central-directory types. */
     if (!directory.end_offset && !directory.entries) archive_read_support_format_zip_streamable(archive);
     else archive_read_support_format_zip_seekable(archive);
     if (*password && archive_read_add_passphrase(archive, password) != ARCHIVE_OK) {
         archive_read_free(archive);
-        close(input);
         return NULL;
     }
     struct zip_source *source = g_try_new(struct zip_source, 1);
     if (!source) {
         archive_read_free(archive);
-        close(input);
         return NULL;
     }
     source->fd = input;
@@ -341,11 +337,9 @@ static struct archive *zip_open_reader(const char *path, const char *password, i
     archive_read_set_close_callback(archive, zip_source_close);
     if (archive_read_open1(archive) != ARCHIVE_OK) {
         archive_read_free(archive);
-        close(input);
         return NULL;
     }
     /* The callbacks borrow the descriptor; zip_close owns its close. */
-    *fd = input;
     *entries = directory.entries;
     return archive;
 }
@@ -380,10 +374,11 @@ static void zip_command(struct native_request *request)
     }
     if (request->cmd == 1) {
         const char *password = string_value(request->param, "password");
-        int fd;
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) { respond(request, 1, NULL); return; }
         uint64_t expected, entries = 0;
-        struct archive *archive = zip_open_reader(path, password, &fd, &expected);
-        if (!archive) { respond(request, 1, NULL); return; }
+        struct archive *archive = zip_open_reader(fd, password, &expected);
+        if (!archive) { close(fd); respond(request, 1, NULL); return; }
         int64_t count = 0;
         struct archive_entry *entry;
         int status;
@@ -400,13 +395,15 @@ static void zip_command(struct native_request *request)
             }
         }
         archive_read_free(archive);
-        close(fd);
         if (status != ARCHIVE_EOF || entries != expected) {
+            close(fd);
             respond(request, 1, NULL);
             return;
         }
-        archive = zip_open_reader(path, password, &fd, &expected);
-        if (!archive) { respond(request, 1, NULL); return; }
+        /* Both views borrow this descriptor, so atomic pathname replacement
+         * cannot change the archive after its regular-file total was counted. */
+        archive = zip_open_reader(fd, password, &expected);
+        if (!archive) { close(fd); respond(request, 1, NULL); return; }
         if (entries != expected) {
             archive_read_free(archive);
             close(fd);

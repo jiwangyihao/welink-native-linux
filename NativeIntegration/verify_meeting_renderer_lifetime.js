@@ -910,6 +910,7 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
   for (const [name, token] of Object.entries(tokens))
     fixture.tokens.set(token, { name, status: name === 'denied' ? 401 : 200 });
   let window, destroy, executeJavaScript, closeError;
+  let closeAttempts = 0;
   const engineEvents = [], cleanupEvents = [];
   bridge.on('engine', message => engineEvents.push(message));
   bridge.on('event', message => { if (message.event === 'media-session-cleanup') cleanupEvents.push(message.data); });
@@ -933,6 +934,7 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
     fixture.active = true;
     const setMenu = window.setMenu;
     window.destroy = function () {
+      ++closeAttempts;
       try { setMenu.call(this, {}); }
       catch (error) {
         closeError = { code: error.code === undefined ? 'SESSION_LOGOUT_FAILED' : String(error.code),
@@ -969,8 +971,10 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
       return executeJavaScript.apply(this, args);
     };
     const rejected = promise => promise.then(() => { throw new Error('Unconfirmed cleanup unexpectedly succeeded'); }, error => error);
+    const attemptsBeforeCleanup = closeAttempts;
     const liveError = await bounded(rejected(bridge.execute('session.logout')), 'still-live browser cleanup refusal');
     const liveCleanup = liveError.details;
+    assert.equal(closeAttempts, attemptsBeforeCleanup + 1, 'One cleanup must not retry a refused destruction');
     assert.equal(liveCleanup.localCleanup.window, 'failed');
     assert.equal(liveCleanup.localCleanupComplete, false);
     assert.ok(liveCleanup.errors.some(error => error.stage === 'window-cleanup' &&
@@ -987,14 +991,12 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
 
     window.webContents.executeJavaScript = executeJavaScript;
     window.destroy = destroy;
-    const closed = new Promise(resolve => window.once('closed', resolve));
-    window.destroy();
-    await bounded(closed, 'exact quarantined credential-owner window closure');
+    assert.equal(window.isDestroyed(), false, 'The test must not close the quarantined window ahead of production disposal');
+    const closedError = await bounded(rejected(bridge.execute('dispose')), 'production disposal closes before token revocation', 60000);
     assert.equal(window.isDestroyed(), true);
-    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'MEDIA_OWNER_CHANGED',
-      'Physical closure alone must not expose a general retired-owner revocation bypass');
-    const closedError = await bounded(rejected(bridge.execute('session.logout')), 'closed-owner actual token revocation', 60000);
     const closedCleanup = closedError.details;
+    assert.equal(closedCleanup.disposed, true);
+    assert.equal(closedCleanup.localCleanup.window, 'closed');
     assert.equal(closedCleanup.localCleanupComplete, true);
     for (const key of ['revocationStorage', 'revocationCache', 'revocationAuthCache', 'revocationConnections'])
       assert.equal(closedCleanup.localCleanup[key], 'cleared');
@@ -1012,22 +1014,18 @@ async function closedBrowserRevocationProof(appRoot, origin, fixture) {
     assert.notEqual(bridge.partition, failedPartition);
     assert.equal(bridge.mediaOrigin, origin);
     assert.equal(failedOwner.retired, true);
-    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'BROWSER_TOKEN_UNOWNED');
+    await assert.rejects(bridge.revokeBrowserCredential(tokens.confirmed), error => error.code === 'MEDIA_OWNER_CHANGED');
     assert.equal(fixture.requests.length, 2, 'Neither a native token nor a stale owner may issue an extra DELETE');
     assert.equal(engineEvents.filter(message => message.event === 'engine-ready').length, 1);
-    const disposal = await bridge.execute('dispose');
-    assert.equal(disposal.disposed, true);
-    assert.equal(disposal.localCleanupComplete, true);
     return { mode: 'closed-browser-revocation', genuineReady: { instance: ready.instance,
       sequence: ready.sequence, sdkVersion: ready.sdkVersion }, liveCleanup, closedCleanup,
       requests: fixture.requests, nativeTokenReads, failedDocumentCredentialReads: failedDocumentCalls,
-      nativeTokenProtected: true, staleOwnerRejected: true };
+      nativeTokenProtected: true, staleOwnerRejected: true, productionDisposalConfirmedClosure: true };
   } finally {
     try {
       if (window && !window.isDestroyed()) {
         window.webContents.executeJavaScript = executeJavaScript;
         window.destroy = destroy;
-        window.destroy();
       }
       if (!bridge.disposed) await bounded(bridge.execute('dispose'), 'credential-proof final browser disposal', 60000);
     } finally { fixture.active = false; fixture.isClosed = () => false; }
