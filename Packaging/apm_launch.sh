@@ -2,6 +2,7 @@
 # Amber PM entry point. Keep the overlay mounted until the app AND any detached
 # updater/restarted descendants exit. Never hand the app to host systemd.
 set -euo pipefail
+umask 077
 if [[ ${IS_ACE_ENV:-} != 1 ]]; then
     # Keep installed APM layers read-only; upstream `apm run` incorrectly uses
     # root-owned package directories as writable upper/work layers.
