@@ -46,8 +46,12 @@ Reconstruction must match every sealed image byte, link and executable mode.
 The ordinary package uses the existing protected SUID sandbox, installed by dpkg;
 one bounded privileged helper copies only that trusted sandbox to a private user
 staging directory. Neither the full installer nor the application runs as root.
-APM uses Chromium's nested user-namespace sandbox instead, with explicit backend
-validation; inability to create the sandbox is an error, not an unsandboxed retry.
+APM selects Chromium's nested user-namespace backend for windows that request
+renderer sandboxing. The launcher does not append a global `--no-sandbox` flag
+or retry with sandboxing disabled when namespace creation fails. Legacy vendor
+Node-integrated renderers remain unsandboxed; this work does not claim complete
+Chromium isolation of the client. Verify each relevant window's actual preferences,
+process identity and kernel sandbox state rather than inferring them from startup flags.
 APM has its own launcher, profile and release directory and must remain inside the
 container for warm activation, URLs, autostart and update/restart.
 
