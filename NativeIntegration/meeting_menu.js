@@ -2,7 +2,7 @@
 
 // Per-window Linux menu for the real MeetingNativeWeb owner. Menu state is read
 // from runtime replies/events, never from a click or a native MenuItem checkbox.
-// The verified vendor ABI (62467 in webrtc-main.6297930e.js) exports HOST = "1";
+// The verified vendor ABI (62467 in main.3ee85ed7.js) exports HOST = "1";
 // screen.audioInputs reports that actual role. conference.end rechecks it itself.
 const HOST_ROLE = '1';
 const RECORDING_ACTIVE = new Set(['preparing', 'starting', 'recording', 'stopping']);

@@ -5,9 +5,9 @@
  * SetEnableCapability's actual signature uses HwmSDKCapabilityType; its parameter
  * comment incorrectly says HwmCapabilityType. This reference is not a claim that
  * every newer enum is present in the campus Windows 100.10.5 DLL.
- * Consumer ABI: main.6297930e.js modules 51361/86989 (CMS routing), 90620/36133
+ * Consumer ABI: main.3ee85ed7.js modules 51361/86989 (CMS routing), 90620/36133
  * (RTM routing), 51339/33287 (CIM/RTM sends), 62467 (wire capability IDs), 58909
- * (share invitation answer), and 404.58f826ce.chunk.js (chat message classes).
+ * (share invitation answer), and 606.616fb575.chunk.js (chat message classes).
  */
 (function (root) {
   'use strict';

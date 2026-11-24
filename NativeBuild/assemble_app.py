@@ -70,6 +70,7 @@ CONFERENCE_HELPERS = (
     "meeting_snapshot_policy.js",
     "meeting_offline_window.js", "meeting_offline_preload.js", "meeting_offline_view.js", "meeting_offline.html",
     "meeting_offline_media.js", "meeting_offline_media.css",
+    "meeting_audio_output.js",
     "meeting_native_web.js", "meeting_native_web_runtime.js", "meeting_native_web_preload.js",
     "meeting_native_web_ui.js", "meeting_native_web_watermark.js", "meeting_native_web_capture.js",
     "meeting_native_web_recording.js", "meeting_native_web_recording_control.js",
@@ -1010,6 +1011,34 @@ def install_renderer_data(app):
         common = common_file.read_text(encoding="utf-8")
         require(common.count('t.imStore={state:{}};') == 1, "IM must retain its real subscribed snapshot")
         common = install_contact_lookup(common)
+        # A resolved native request is only a receipt, not proof of a copied
+        # file. Keep the fs-extra error as the cause and the native receipt for
+        # diagnosis; screenshot preparation must not publish a missing target.
+        common = change(common,
+            's.error(a,"reTry copy"),await i.default.getNativetools().copyFileByStream({src:e,dest:t})',
+            's.error(a,"reTry copy");'
+            'const n=await i.default.getNativetools().copyFileByStream({src:e,dest:t});'
+            'if(!n||"object"!==typeof n||Array.isArray(n)||0!==n.result){'
+            'const e=new Error("copyFileByStream failed: "+'
+            '(n&&void 0!==n.result?"result="+n.result:"missing or invalid native receipt")+'
+            '"; fs-extra copy: "+a.message);e.cause=a;e.nativeResponse=n;throw e}')
+        # Clean EOF is explicit and carries no file_stream. Empty/directory-only
+        # ZIPs must finish without parsing a nonexistent message, while damaged
+        # archive replies still take the existing failure/close path first.
+        common = change(common,
+            'const{total_num:a,cur_num:n,file_stream:i}=e.param;'
+            'L.info(`saveZipData decompress total_num:${a}, cur_num:${n}`)',
+            'if(!0===e.param.end_of_archive){P&&(await P,P=null);'
+            'V({payload:{progress:100}});'
+            'return void(0,o.default)(Z,1e3*k.doneTime,{filePath:t})}'
+            'const{total_num:a,cur_num:n,file_stream:i}=e.param;'
+            'L.info(`saveZipData decompress total_num:${a}, cur_num:${n}`)')
+        common = change(common,
+            'catch(e){P=null,await q({filePath:t}),L.error("saveZipData error:",e)}',
+            'catch(e){P=null;await q({filePath:t});L.error("saveZipData error:",e);return}')
+        common = change(common,
+            'return L.error("saveZipData decompress openZipFile zip failed"),void q({filePath:t})',
+            'return L.error("saveZipData decompress openZipFile zip failed"),void await q({filePath:t})')
         reducer_file = app / directory / "1511.js"
         reducer_file.write_text(install_contact_alias_cache(reducer_file.read_text(encoding="utf-8")),
                                 encoding="utf-8")

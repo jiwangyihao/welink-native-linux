@@ -2,7 +2,7 @@
 'use strict';
 /* Parent-run acceptance on the packaged Electron, in an isolated network namespace.
  * WELINK_TEST_NATIVE: assembled resources/app/native; WELINK_TEST_WEBASSETS: pinned
- * main.6297930e.js/404.58f826ce provider www tree; WELINK_TEST_OUTPUT: existing output dir.
+ * main.3ee85ed7.js/606.616fb575 provider www tree; WELINK_TEST_OUTPUT: existing output dir.
  * Real campus facade, native auth configuration, IPC, Electron window/menu, original
  * provider reducers/sagas, HRTC and WebSocket transports. Inputs are explicitly local
  * synthetic notifications and a loopback RTM peer: no account, conference membership,

@@ -25,6 +25,7 @@ jobs:
         run: |
           python3 Packaging/verify_seed.py
           node Conference/verify_sdk_log_namespace.js
+          node Conference/verify_audio_output.js
           bash -n install.sh Packaging/build_apm.sh Packaging/apm_launch.sh
           node --check NativeBuild/sign_packages.js
       - name: State acceptance boundary

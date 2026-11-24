@@ -1,6 +1,6 @@
 'use strict';
 
-// The pinned meeting security panel (404.58f826ce) marks “Forbid screenshots”
+// The pinned meeting security panel (606.616fb575) marks “Forbid screenshots”
 // active when forbiddenScreenShots === FORBID_SCREEN_SHOOTS.DISABLED (1).
 // Support flags describe UI availability; they are not grants to take pictures.
 (function(root) {

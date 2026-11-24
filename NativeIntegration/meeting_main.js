@@ -673,14 +673,22 @@ function installMeetingMain({ electron, appRoot }) {
       throw failure('DEVICE_CAPTURE_DISABLED', before.policy[params.kind].reason);
     const selection = await meetingData(record, 'device.select', { kind: params.kind, deviceId: params.deviceId });
     const after = await deviceState(record);
+    if (before.state.joined !== after.state.joined || before.state.sessionKey !== after.state.sessionKey)
+      throw failure('CONFERENCE_CHANGED', 'The device selection belongs to a different media session');
     if (!selection || typeof selection.active !== 'boolean' || !selection.selection ||
         selection.selection[params.kind] !== params.deviceId || after.state.selectedDevices[params.kind] !== params.deviceId) {
       const error = failure('DEVICE_SELECTION_UNCONFIRMED', 'The genuine runtime did not retain the selected device');
       error.details = { selection, state: after.state };
       throw error;
     }
+    if (params.kind === 'audiooutput' && after.state.joined) {
+      const routing = selection.routing;
+      if (!routing || !Number.isSafeInteger(routing.sinkCount) || routing.sinkCount < 0 ||
+          routing.verified !== (routing.sinkCount > 0) || selection.active !== routing.verified)
+        throw failure('DEVICE_SELECTION_UNCONFIRMED', 'The runtime did not verify actual receiving audio sinks');
+    }
     return { ...after, selection, selectionVerified: true,
-      effect: selection.active ? 'connected-session-selection' : 'premeeting-preference-only' };
+      effect: selection.active ? 'connected-session-selection' : after.state.joined ? 'connected-preference-only' : 'premeeting-preference-only' };
   }
 
   async function openDeviceSettings(record) {

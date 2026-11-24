@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Per-user first installation from a packaged, precompiled, hash-locked image recipe."""
+"""Per-user installation from a packaged, precompiled, hash-locked image recipe.
+
+Activation migrates only existing profile-owned autostart entries in the user's
+active XDG configuration, preserving disabled state and unrelated integration.
+"""
 import argparse
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -124,6 +129,14 @@ def activate(home, profile, launcher, image, apm, previous):
             command += ["--apm-package", apm]
         if previous:
             command += ["--previous-image", str(previous[0])]
+            config_home = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+            if not config_home.is_absolute():
+                raise RuntimeError("XDG_CONFIG_HOME must be absolute.")
+            identifier = (apm or "cn.edu.hit.welink.native") + "-" + hashlib.sha256(os.fsencode(profile)).hexdigest()[:16]
+            autostart = config_home / "autostart" / (identifier + ".desktop")
+            if autostart.exists() or autostart.is_symlink():
+                # The installer checks ownership and preserves explicit disabled state.
+                command += ["--autostart-file", str(autostart)]
         plan = json.loads(subprocess.check_output([*command, "--plan"], text=True))
         before = {item["path"]: supervisor.snapshot(Path(item["path"])) for item in plan}
         if profile.exists():

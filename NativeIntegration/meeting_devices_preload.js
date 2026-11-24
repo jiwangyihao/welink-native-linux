@@ -83,7 +83,9 @@ window.addEventListener('DOMContentLoaded', () => {
       render(reply.data);
       status.textContent = reply.data.selectionVerified === true ?
         (reply.data.selection.active ? 'The connected-session device selection was retained and verified.' :
-          'The pre-meeting preference was retained and verified. No device was activated.') :
+          reply.data.effect === 'connected-preference-only' ?
+            'The meeting output preference was saved. No receiving audio player was active to verify routing.' :
+            'The pre-meeting preference was retained and verified. No device was activated.') :
         'Showing actual enumerated devices and retained preferences. Choose a device explicitly to change it.';
     } catch (error) {
       current = null;

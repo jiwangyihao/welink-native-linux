@@ -156,7 +156,7 @@ module.exports = async function verifyInvitedShare({ electron, native, origin, o
     await until(() => evaluate(`invitedShareTest.inputs[1].getVideoTracks()[0].readyState==='ended' && invitedShareTest.stopped()>0`), 'host stop closes actual manual stream');
     await evaluate('invitedShareTest.dispose()');
     assert.equal(permissionRequests, 0, 'The generated local input requested a device grant');
-    return { originalWorker: 'main.6297930e.js:55375', actualSdk: 'HRTC 1.10.96', input: 'generated-local-canvas-video-not-desktop',
+    return { originalWorker: 'main.3ee85ed7.js:55375', actualSdk: 'HRTC 1.10.96', input: 'generated-local-canvas-video-not-desktop',
       disabledBeforeAccept: { captures: 0, shareRequests: 0 }, pendingInvitationCancelled: true,
       realChooserCancelled: true, lateTrackEnded: true, publicationRejected: true,
       manualSharePreserved: true, staleCancellationIsolated: true, hostStopPreserved: true, permissionRequests, chooserEvents };

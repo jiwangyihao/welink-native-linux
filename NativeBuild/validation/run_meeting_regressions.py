@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the six offline meeting regressions against an already sealed IMAGE.
+"""Run offline meeting regressions against an already sealed IMAGE.
 
 Run as root (private mount/network/PID namespaces, then drop to nobody):
   python3 NativeBuild/validation/run_meeting_regressions.py \
@@ -30,6 +30,9 @@ import time
 
 SUITES = {
     "sdk": ("verify_native_capabilities.js", "Offline local SDK policy and original provider consumers; no real meeting or server grants"),
+    "audio-output": ("verify_audio_output_electron.js", "Actual Chromium media-sink completion/rejection; no capture or cloud meeting claim"),
+    "renderer-files": ("verify_renderer_file_receipts.js", "Real shipped file consumers and native providers; synthetic files, no account or SQLite claim"),
+    "renderer-recovery": ("verify_meeting_renderer_lifetime.js", "Real media-owner crash/navigation recovery; no cloud meeting or login claim"),
     "native-video-x11": ("meeting_render_surface_verify.js", "Actual native per-stream X11 windows and independent pixel observation of generated MediaStreamTracks"),
     "moderation": ("verify_moderation_capabilities.js", "Isolated authenticated CMS/HRTC, native consent and original web consumers; not enterprise admission"),
     "guest-voice": ("verify_guest_voice.js", "Generated speech, real PNR worker and decoded RTP; no real biometrics or live-room quality claim"),
@@ -44,8 +47,8 @@ COMPANIONS = (
 PERSON_SHA256 = "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5"
 SPEECH_SHA256 = "7f7064e26499bebaa63d9b11df96e121c9d68ccd121e6517a71c59af9bc36f0f"
 PROVIDER_SHA256 = {
-    "static/js/main.6297930e.js": "3da44cce0fa14f9a225fcfbb15c84e2ffe5940f2a2d30f396cdb12ee08ccdf6d",
-    "static/js/404.58f826ce.chunk.js": "4561e476301a2519f991974ca1b25e24d6065f0c4c22c54fe14bc8e9d473d47a",
+    "static/js/main.3ee85ed7.js": "bdd1fbedaf5e4b51e7c7b27ee3c5ea1de5b82178a3ac7331431784127c858f8a",
+    "static/js/606.616fb575.chunk.js": "13b2cfc34416cb8aeb240b57f8d4498efa5916a9022bb30bf58dce80b854fa83",
 }
 
 BOOTSTRAP = r"""'use strict';
@@ -54,6 +57,9 @@ const electron = require('electron'), {app} = electron;
 const suite = process.env.WELINK_QA_SUITE;
 const scripts = {
   sdk: 'verify_native_capabilities.js',
+  'audio-output': 'verify_audio_output_electron.js',
+  'renderer-files': 'verify_renderer_file_receipts.js',
+  'renderer-recovery': 'verify_meeting_renderer_lifetime.js',
   'native-video-x11': 'meeting_render_surface_verify.js',
   moderation: 'verify_moderation_capabilities.js',
   'guest-voice': 'verify_guest_voice.js',
@@ -75,6 +81,12 @@ app.on('quit', () => {
 if (suite === 'native-video-x11') {
   // Packaged Electron ignores a script pathname in argv; this is its real main.
   process.argv = [process.execPath, path.join(__dirname, scripts[suite]), payload, ...process.argv.slice(1)];
+}
+if (suite === 'renderer-files' || suite === 'renderer-recovery') {
+  process.argv = [process.execPath, path.join(__dirname, scripts[suite]), '--app', payload,
+    '--web-assets', process.env.WELINK_TEST_WEBASSETS];
+  if (suite === 'renderer-recovery') process.argv.push('--recovery-only');
+  else process.env.WELINK_TEST_ACORN = path.join(__dirname, 'qa-deps/acorn.js');
 }
 if (suite === 'custom-background') {
   app.setPath('userData', path.join(process.env.HOME, 'background-profile'));
@@ -255,6 +267,8 @@ def collect_receipt(suite, directory, work):
         passed = data.get("pass") is True and data.get("supportedTypes") == list(range(14))
     elif suite == "native-video-x11":
         passed = bool(data.get("observations")) and data.get("scope") == "isolated generated MediaStreamTracks; no production meeting"
+    elif suite in ("renderer-files", "renderer-recovery"):
+        passed = data.get("passed") is True
     elif suite == "guest-voice":
         passed = data.get("result") == "passed" and data.get("realDevices") is False and data.get("realAccounts") is False
     elif suite == "custom-background":
@@ -300,6 +314,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--image", required=True, type=Path)
     parser.add_argument("--evidence", required=True, type=Path)
+    parser.add_argument("--suite", action="append", choices=tuple(SUITES), help="Select specific suites; default is all")
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[2],
                         help="Verifier scripts only; no production modules are copied from here")
     parser.add_argument("--web-assets", type=Path, default=Path("/tmp/hit-vendor-reference-9d0atqa7/www"))
@@ -307,6 +322,7 @@ def main():
     parser.add_argument("--person-fixture", type=Path, default=Path("/tmp/welink-custom-background-qa/astronaut.png"))
     parser.add_argument("--speech-fixture", type=Path, default=Path("/var/tmp/wl-guest-voice-INEgQ4/synthetic.wav"))
     args = parser.parse_args()
+    selected = {name: SUITES[name] for name in dict.fromkeys(args.suite or SUITES)}
     if os.geteuid() != 0:
         parser.error("Run as root: isolated mount/network/PID namespaces are mandatory; suites run as nobody")
     os.umask(0o077)
@@ -319,12 +335,18 @@ def main():
         parser.error("Evidence must be outside the sealed image and Conference source directory")
     if evidence.exists() and (not evidence.is_dir() or any(evidence.iterdir())):
         parser.error("Evidence directory must be new or empty (stale results must never count as success)")
-    tools = ("unshare", "mount", "ip", "runuser", "timeout", "xvfb-run", "Xvfb", "xauth", "openbox", "xdotool", "xprop", "openssl", "python3")
+    tools = ("unshare", "mount", "ip", "runuser", "timeout", "xvfb-run", "Xvfb", "xauth", "openbox", "xdotool", "xprop", "openssl", "python3", "node")
     missing = [tool for tool in tools if not shutil.which(tool)]
     if missing:
         parser.error("Missing offline host dependencies (nothing is downloaded): " + ", ".join(missing))
-    tests = sorted({item[0] for item in SUITES.values()} | set(COMPANIONS))
-    required = [source / name for name in tests] + [
+    tests = sorted({item[0] for item in selected.values()} | set(COMPANIONS))
+    test_sources = {name: source / name for name in tests}
+    for name in ("verify_renderer_file_receipts.js", "verify_meeting_renderer_lifetime.js"):
+        if name in test_sources:
+            test_sources[name] = source.parent / "NativeIntegration" / name
+    acorn = Path(subprocess.check_output(["node", "-p", "require.resolve('acorn')"],
+                 cwd=args.source_root, text=True).strip()) if "renderer-files" in selected else None
+    required = list(test_sources.values()) + ([acorn] if acorn else []) + [
         image / "electron", image / "chrome-sandbox", image / "resources/app/package.json",
         image / "resources/app/native/build.json", image / "resources/app/native/distribution-sha256.json",
         image / "resources/app/native/meeting_custom_background_host.js",
@@ -347,7 +369,7 @@ def main():
     os.chown(evidence, nobody.pw_uid, nobody.pw_gid)
     summary = {
         "image": str(image), "started": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "scope": "Six offline sealed-image meeting regressions; no client cutover or live enterprise acceptance",
+        "scope": "Selected offline sealed-image compatibility regressions; no client cutover or live enterprise acceptance",
         "officialParticipantReportAccepted": False,
         "participantReportBoundary": "A successful suite proves only local confirmation, loopback synthetic HTTP success/refusal and owner retirement. Actual authenticated roster selection and official service acceptance remain untested; no official request is sent.",
         "suites": {}, "passed": False,
@@ -372,9 +394,16 @@ def main():
             (work / name).chmod(0o755)
         for name in tests:
             target = work / "testapp" / name
-            shutil.copyfile(source / name, target)
+            shutil.copyfile(test_sources[name], target)
             target.chmod(0o644)
         (work / "testapp/meeting_custom_background_host.js").symlink_to(work / "payload/native/meeting_custom_background_host.js")
+        if acorn:
+            dependencies = work / "testapp/qa-deps"
+            dependencies.mkdir(mode=0o755)
+            dependencies.chmod(0o755)
+            shutil.copyfile(acorn, dependencies / "acorn.js")
+            (dependencies / "acorn.js").chmod(0o644)
+            manifest["verifierDependencies"] = {"acorn": digest(acorn)}
         (work / "testapp/main.js").write_text(BOOTSTRAP)
         (work / "testapp/main.js").chmod(0o644)
         write_json(work / "testapp/package.json", {"name": "sealed-meeting-regressions", "version": "1.0.0", "main": "main.js"})
@@ -387,7 +416,7 @@ def main():
         (work / "run-display.sh").chmod(0o644)
         manifest["verifierSha256"] = {name: digest(work / "testapp" / name) for name in tests}
         write_json(evidence / "inputs.json", manifest)
-        for suite, (_, scope) in SUITES.items():
+        for suite, (_, scope) in selected.items():
             directory = evidence / suite
             directory.mkdir(mode=0o700)
             os.chown(directory, nobody.pw_uid, nobody.pw_gid)
@@ -415,7 +444,7 @@ def main():
             summary["suites"][suite] = result
             write_json(evidence / "summary.json", summary)
             print(f"{'PASS' if result['passed'] else 'FAIL'} {suite}", flush=True)
-    summary["passed"] = len(summary["suites"]) == len(SUITES) and all(result["passed"] for result in summary["suites"].values())
+    summary["passed"] = len(summary["suites"]) == len(selected) and all(result["passed"] for result in summary["suites"].values())
     summary["finished"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     write_json(evidence / "summary.json", summary)
     print(f"Summary: {evidence / 'summary.json'}", flush=True)

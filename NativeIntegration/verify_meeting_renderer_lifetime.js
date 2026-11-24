@@ -7,8 +7,13 @@
 // A mounted fixture app may require this script with WELINK_QA_APP and
 // WELINK_QA_WEB_ASSETS instead of argv. WELINK_QA_MEETING_EXIT_ONLY=1 (or
 // --exit-only) selects only the real packaged tray-exit regressions.
+// WELINK_QA_MEETING_RECOVERY_ONLY=1 (or --recovery-only) selects genuine media
+// renderer crash/navigation recovery. Only the owned disposable provider window
+// is terminated; real request/cleanup results are delayed, never fabricated.
 // exit-host-failure injects an invalid Menu argument at the real Electron cleanup
 // boundary; the genuine broker captures/returns the resulting API rejection.
+// document-close-failure injects that same real Electron rejection at the owned
+// window's destroy boundary; the live document must immediately lose authority.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -44,6 +49,12 @@ function bounded(promise, label, timeout = 15000) {
   return Promise.race([promise, new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(label + ' timed out')), timeout);
   })]).finally(() => clearTimeout(timer));
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
 }
 
 async function rendererProof(input) {
@@ -457,6 +468,169 @@ async function rendererProof(input) {
   const init = await bridge.requestNative('init', [{}], 50);
   assert.notEqual(init.result, 0, 'Native cmd50 must not report readiness without a genuine media engine');
 
+  if (['renderer-loss', 'document-navigation', 'document-close-failure'].includes(input.mode)) {
+    const closeFailure = input.mode === 'document-close-failure';
+    const genuine = await bounded(bridge.initializeMedia(), 'provider before document loss', 60000);
+    assert.equal(genuine.event, 'engine-ready');
+    assert.equal(genuine.sdkVersion, '1.10.96');
+    const registration = bridge.registration, generation = bridge.generation;
+    const state = await bridge.execute('state.get');
+    assert.equal(state.ready, true);
+    assert.equal(state.joined, false, 'Recovery must not require a meeting');
+    assert.ok(!state.roomJoined);
+    const originalEnvelope = observed.find(envelope => envelope.kind === 'engine' &&
+      envelope.message.instance === genuine.instance && envelope.message.sequence === genuine.sequence);
+    assert.ok(originalEnvelope, 'Readiness must originate in a real IPC engine event');
+    const unavailable = deferred(), cleaned = deferred();
+    const reason = input.mode === 'renderer-loss' ? 'renderer-gone' : 'document-navigation';
+    const onEngine = message => {
+      if (message.event === 'engine-unavailable' && message.reason === reason) unavailable.resolve(message);
+    };
+    const onEvent = message => {
+      if (message.event === 'media-session-cleanup') cleaned.resolve(message.data);
+    };
+    bridge.on('engine', onEngine);
+    bridge.on('event', onEvent);
+    try {
+      const originalOwner = await control('arm-media-loss');
+      // Hold delivery of a real state.get result. Renderer loss must settle the
+      // public request without waiting for the vanished JavaScript context.
+      const pending = rejected(bridge.execute('state.get'));
+      await bounded(control('media-request-held'), 'genuine media reply held before loss');
+      const loss = await bounded(control('lose-media-document'), 'owned media document retirement');
+      const lost = await bounded(unavailable.promise, 'real media unavailable event');
+      assert.equal(loss.id, originalOwner.id);
+      assert.equal(loss.destroyed, !closeFailure);
+      assert.equal(loss.serviceAlive, true);
+      assert.equal(lost.instance, genuine.instance);
+      assert.ok(lost.sequence > genuine.sequence);
+      assert.equal((await bounded(pending, 'pending real media request retirement')).code, 'MEDIA_OWNER_CHANGED');
+      noMedia();
+      assert.notEqual((await bridge.requestNative('init', [{}], 50)).result, 0,
+        'The stopped media renderer cannot authorize native readiness');
+      const callbacksAtLoss = delivered.length;
+      assert.doesNotThrow(() => bridge.eventListener({}, originalEnvelope));
+      noMedia();
+      assert.equal(delivered.length, callbacksAtLoss, 'A genuine but stale ready packet must remain retired');
+
+      if (closeFailure) {
+        const cleanup = await bounded(cleaned.promise, 'refused-close cleanup failure');
+        assert.equal(cleanup.localCleanup.window, 'failed');
+        assert.equal(cleanup.localCleanupComplete, false);
+        assert.deepEqual(cleanup.errors, [loss.closeError], 'Retain the exact real Electron close-boundary rejection');
+        const denied = await bounded(control('failed-media-authority'), 'live failed-document IPC rejection', 60000);
+        assert.equal(denied.receiveRejected, true);
+        const blocked = await bounded(rejected(bridge.initializeMedia()), 'replacement blocked by failed closure');
+        assert.equal(blocked.code, 'SESSION_LOGOUT_IN_PROGRESS');
+        assert.equal(bridge.engineWaiters.size, 0);
+        noMedia();
+        const owners = await control('media-owners');
+        assert.deepEqual(owners, [{ id: originalOwner.id, freshPartition: false }],
+          'A failed close must not authorize a replacement window or partition');
+        await control('release-media-request');
+        await delay();
+        noMedia();
+        assert.equal(observed.filter(envelope => envelope.kind === 'engine' &&
+          envelope.message.event === 'engine-ready').length, 1);
+        assert.ok(!observed.some(envelope => envelope.kind === 'event' &&
+          (envelope.message.event === 'left' || (envelope.message.event === 'meeting-lifecycle' &&
+            envelope.message.data?.state === 'left'))), 'Refused closure cannot confirm remote leave');
+        // Remove only the isolated fault, then confirm actual destruction before
+        // disposing this browser owner. Never run the account logout path.
+        assert.equal((await control('close-failed-media-document')).destroyed, true);
+        await control('release-media-cleanup');
+        let disposalReceipt;
+        const disposalError = await bounded(rejected(bridge.callRegistered('dispose', {}, registration, receipt => {
+          disposalReceipt = receipt;
+        })), 'failed-document browser-only disposal');
+        assert.equal(disposalError.code, 'BROWSER_CREDENTIALS_UNAVAILABLE');
+        const browserCleanup = disposalError.details;
+        assert.equal(browserCleanup.disposed, true);
+        assert.equal(browserCleanup.localCleanupComplete, true);
+        assert.deepEqual(browserCleanup.errors.map(({ stage, code }) => ({ stage, code })), [
+          { stage: 'credentials-before-leave', code: 'BROWSER_CREDENTIALS_UNAVAILABLE' },
+          { stage: 'browser-credentials', code: 'BROWSER_CREDENTIALS_UNAVAILABLE' }
+        ]);
+        assert.equal(browserCleanup.serverLogout.status, 'unconfirmed');
+        assert.equal(browserCleanup.serverLogout.inventoryConfirmed, false);
+        assert.equal(disposalReceipt.hostCleanup.complete, true);
+        assert.deepEqual(disposalReceipt.hostCleanup.errors, []);
+        return finish({ mode: input.mode, realDocumentLoss: loss, failedDocumentCleanup: cleanup,
+          liveDocumentAuthorityRevoked: true, pendingRequestRetired: true, replacementBlocked: true,
+          offlineBrowserCleanup: browserCleanup, hostCleanup: disposalReceipt.hostCleanup }, originalEnvelope);
+      }
+
+      await bounded(control('media-cleanup-held'), 'actual isolated storage cleanup');
+      let recovered = false;
+      const recovery = bridge.initializeMedia();
+      recovery.then(() => { recovered = true; }, () => { recovered = true; });
+      await delay();
+      assert.deepEqual(await control('media-owners'), [], 'Explicit recovery must wait for old-owner cleanup');
+      assert.equal(recovered, false);
+      await control('release-media-cleanup');
+      const replacement = await bounded(recovery, 'explicit genuine provider recovery', 60000);
+      const cleanup = await bounded(cleaned.promise, 'failed-document cleanup receipt');
+      assert.equal(cleanup.localCleanup.window, 'closed');
+      assert.equal(cleanup.localCleanupComplete, true);
+      assert.deepEqual(cleanup.errors.map(({ stage, code }) => ({ stage, code })), [
+        { stage: 'credentials-before-leave', code: 'BROWSER_CREDENTIALS_UNAVAILABLE' },
+        { stage: 'browser-credentials', code: 'BROWSER_CREDENTIALS_UNAVAILABLE' }
+      ], 'The destroyed document inventory must not become a fabricated logout confirmation');
+      assert.deepEqual(cleanup.serverLogout, { status: 'unconfirmed', confirmed: false,
+        credentials: 0, revoked: 0, protectedNative: 0, unconfirmed: 0, inventoryConfirmed: false });
+      assert.equal(bridge.registration, registration, 'Recovery must preserve the registered account authority');
+      assert.equal(bridge.generation, generation);
+      assert.equal(replacement.instance, genuine.instance);
+      assert.ok(replacement.sequence > lost.sequence);
+      assert.equal(replacement.sdkVersion, genuine.sdkVersion);
+      assert.equal(replacement.vendorAsset, genuine.vendorAsset);
+      assert.equal(bridge.mediaReady, true);
+      assert.equal(bridge.engineWaiters.size, 0);
+      assert.equal(JSON.parse(native.meetingBindings().capabilities()).mediaReady, true);
+      const owners = await control('media-owners');
+      assert.equal(owners.length, 1);
+      assert.notEqual(owners[0].id, originalOwner.id);
+      assert.equal(owners[0].freshPartition, true, 'The failed browser partition must not be reused');
+      await control('release-media-request');
+      await delay();
+      assert.equal(bridge.mediaReady, true, 'The late old-document result cannot retire or replace the new owner');
+      const current = await bridge.execute('state.get');
+      assert.equal(current.ready, true);
+      assert.equal(current.joined, false);
+      assert.ok(!current.roomJoined);
+      const engines = observed.filter(envelope => envelope.kind === 'engine').map(envelope => envelope.message);
+      assert.equal(engines.filter(message => message.event === 'engine-ready').length, 2);
+      assert.equal(delivered.filter(item => item.message.event === 'engine-ready').length, 2);
+      assert.ok(engines.every((message, index) => !index || message.sequence > engines[index - 1].sequence));
+      assert.ok(!observed.some(envelope => envelope.kind === 'event' &&
+        (envelope.message.event === 'left' || (envelope.message.event === 'meeting-lifecycle' &&
+          envelope.message.data?.state === 'left'))), 'Document loss is not a confirmed remote leave');
+      assert.equal((await bridge.requestNative('init', [{}], 50)).result, 0);
+      let disposalReceipt;
+      const browserCleanup = await bounded(bridge.callRegistered('dispose', {}, registration, receipt => {
+        disposalReceipt = receipt;
+      }), 'recovered browser-owner disposal');
+      assert.equal(browserCleanup.disposed, true);
+      assert.equal(browserCleanup.localCleanupComplete, true);
+      assert.deepEqual(browserCleanup.errors, []);
+      assert.equal(browserCleanup.serverLogout.status, 'not-required');
+      assert.equal(disposalReceipt.hostCleanup.complete, true);
+      assert.deepEqual(disposalReceipt.hostCleanup.errors, []);
+      return finish({ mode: input.mode, realDocumentLoss: loss, failedDocumentCleanup: cleanup,
+        initialReady: { instance: genuine.instance, sequence: genuine.sequence, sdkVersion: genuine.sdkVersion },
+        recoveredReady: { instance: replacement.instance, sequence: replacement.sequence,
+          sdkVersion: replacement.sdkVersion, vendorAsset: replacement.vendorAsset },
+        freshMediaPartition: true, pendingRequestRetired: true, staleReadyRejected: true,
+        accountAuthorityPreserved: true, explicitRecovery: true, browserCleanup,
+        hostCleanup: disposalReceipt.hostCleanup }, originalEnvelope);
+    } finally {
+      bridge.removeListener('engine', onEngine);
+      bridge.removeListener('event', onEvent);
+      await control('release-media-cleanup');
+      await control('release-media-request');
+    }
+  }
+
   if (input.mode === 'ready') {
     // This boots the unchanged pinned provider application, preload and HRTC;
     // only their static bytes are served locally. No readiness field is written.
@@ -730,8 +904,8 @@ async function rendererProof(input) {
   const appRoot = option('--app');
   const assets = option('--web-assets');
   for (const [name, digest] of [
-    ['main.6297930e.js', '3da44cce0fa14f9a225fcfbb15c84e2ffe5940f2a2d30f396cdb12ee08ccdf6d'],
-    ['404.58f826ce.chunk.js', '4561e476301a2519f991974ca1b25e24d6065f0c4c22c54fe14bc8e9d473d47a']
+    ['main.3ee85ed7.js', 'bdd1fbedaf5e4b51e7c7b27ee3c5ea1de5b82178a3ac7331431784127c858f8a'],
+    ['606.616fb575.chunk.js', '13b2cfc34416cb8aeb240b57f8d4498efa5916a9022bb30bf58dce80b854fa83']
   ]) assert.equal(createHash('sha256').update(fs.readFileSync(path.join(assets, 'static/js', name))).digest('hex'), digest, name);
   assert.ok(fs.readFileSync(path.join(assets, 'static/js/12.eb3d2838.chunk.js')).equals(
     fs.readFileSync(path.join(appRoot, 'native/vendor/hrtc-12.eb3d2838.js'))), 'The HRTC bytes must match the sealed image');
@@ -779,6 +953,16 @@ async function rendererProof(input) {
   let activeMode;
   const hostCleanupFaults = [];
   let service = null, armed = false, held = null, heldResolve = null, heldPromise = null;
+  let mediaFault = null;
+  const releaseMediaFault = () => {
+    if (!mediaFault) return;
+    mediaFault.request.release.resolve();
+    mediaFault.cleanup.release.resolve();
+    mediaFault.contents.executeJavaScript = mediaFault.executeJavaScript;
+    mediaFault.session.clearStorageData = mediaFault.clearStorageData;
+    mediaFault.window.destroy = mediaFault.destroy;
+    mediaFault = null;
+  };
   let blockedNetworkRequests = 0;
   const gateSession = session => {
     session.setCertificateVerifyProc((request, done) => {
@@ -790,7 +974,7 @@ async function rendererProof(input) {
     session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (request, callback) => {
       if (/^https?:|^wss?:/.test(request.url)) {
         const url = new URL(request.url);
-        if (['ready', 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(activeMode) &&
+        if (['ready', 'renderer-loss', 'document-navigation', 'document-close-failure', 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(activeMode) &&
             url.origin === providerOrigin) { callback({}); return; }
         ++blockedNetworkRequests;
         if (armed && url.origin === ORIGIN && request.resourceType === 'mainFrame') {
@@ -808,8 +992,119 @@ async function rendererProof(input) {
   await app.whenReady();
   gateSession(electron.session.defaultSession);
   const disposeBroker = require(path.join(appRoot, 'native/meeting_main.js')).installMeetingMain({ electron, appRoot });
-  ipcMain.handle(CONTROL, (event, request) => {
+  ipcMain.handle(CONTROL, async (event, request) => {
     assert.ok(service && event.sender === service.webContents && event.senderFrame === event.sender.mainFrame);
+    if (['arm-media-loss', 'media-request-held', 'media-cleanup-held', 'lose-media-document',
+      'media-owners', 'release-media-request', 'release-media-cleanup', 'failed-media-authority',
+      'close-failed-media-document'].includes(request.action)) {
+      assert.ok(['renderer-loss', 'document-navigation', 'document-close-failure'].includes(activeMode));
+      const windows = () => BrowserWindow.getAllWindows().filter(window => window !== service &&
+        window.getParentWindow() === service && window.webContents.getURL().startsWith(providerOrigin + '/'));
+      if (request.action === 'arm-media-loss') {
+        assert.equal(mediaFault, null);
+        const owners = windows();
+        assert.equal(owners.length, 1, 'The loss must target only this service owner’s genuine provider');
+        const window = owners[0], contents = window.webContents, session = contents.session;
+        const pid = contents.getOSProcessId();
+        assert.ok(pid > 0);
+        assert.ok(BrowserWindow.getAllWindows().every(other => other === window ||
+          other.webContents.getOSProcessId() !== pid), 'Never terminate a renderer shared with another window');
+        mediaFault = { window, contents, session, id: contents.id, pid,
+          request: { entered: deferred(), release: deferred() },
+          cleanup: { entered: deferred(), release: deferred() },
+          executeJavaScript: contents.executeJavaScript, clearStorageData: session.clearStorageData, destroy: window.destroy };
+        const fault = mediaFault;
+        if (activeMode === 'document-close-failure') {
+          const environment = await contents.executeJavaScript('window.__welinkMeetingHost.captureEnvironment()');
+          assert.equal(environment.platform, 'linux', 'The genuine current document must initially have IPC authority');
+        }
+        contents.executeJavaScript = function (...args) {
+          contents.executeJavaScript = fault.executeJavaScript;
+          return fault.executeJavaScript.apply(this, args).then(value => {
+            fault.request.entered.resolve();
+            return fault.request.release.promise.then(() => value);
+          });
+        };
+        session.clearStorageData = function (...args) {
+          session.clearStorageData = fault.clearStorageData;
+          return fault.clearStorageData.apply(this, args).then(value => {
+            fault.cleanup.entered.resolve();
+            return fault.cleanup.release.promise.then(() => value);
+          });
+        };
+        if (activeMode === 'document-close-failure') {
+          const setMenu = window.setMenu;
+          window.destroy = function () {
+            // The real Electron API throws; no close, receipt or readiness state
+            // is forged. Keep the fault armed until the test explicitly removes it.
+            try { setMenu.call(this, {}); }
+            catch (error) {
+              fault.closeError = { stage: 'window-retirement',
+                code: error.code === undefined ? 'SESSION_LOGOUT_FAILED' : String(error.code),
+                message: String(error.message || 'The browser session operation failed') };
+              throw error;
+            }
+            throw new Error('Electron unexpectedly accepted an invalid Menu at the close boundary');
+          };
+        }
+        return { id: contents.id, pid };
+      }
+      if (request.action === 'release-media-request') { mediaFault?.request.release.resolve(); return true; }
+      if (request.action === 'release-media-cleanup') { mediaFault?.cleanup.release.resolve(); return true; }
+      assert.ok(mediaFault);
+      if (request.action === 'media-request-held') return bounded(mediaFault.request.entered.promise, 'actual provider request');
+      if (request.action === 'media-cleanup-held') return bounded(mediaFault.cleanup.entered.promise, 'actual browser storage cleanup');
+      if (request.action === 'media-owners') return windows().map(window => ({ id: window.webContents.id,
+        freshPartition: window.webContents.session !== mediaFault.session }));
+      if (request.action === 'failed-media-authority') {
+        assert.equal(activeMode, 'document-close-failure');
+        assert.equal(mediaFault.window.isDestroyed(), false);
+        await bounded(mediaFault.navigation, 'actual live replacement document', 60000);
+        const reply = await mediaFault.contents.executeJavaScript(
+          'window.__welinkMeetingHost.captureEnvironment().then(() => ({rejected:false}), ' +
+          'error => ({rejected:true,message:String(error.message)}))');
+        assert.equal(reply.rejected, true, 'The still-live failed window must not retain private IPC authority');
+        assert.match(reply.message, /Rejected a foreign or retired meeting bridge sender/);
+        return { receiveRejected: true };
+      }
+      if (request.action === 'close-failed-media-document') {
+        assert.equal(activeMode, 'document-close-failure');
+        assert.equal(mediaFault.window.isDestroyed(), false);
+        const closed = new Promise(resolve => mediaFault.window.once('closed', resolve));
+        mediaFault.window.destroy = mediaFault.destroy;
+        mediaFault.window.destroy();
+        await bounded(closed, 'actual previously refused window closure');
+        return { destroyed: mediaFault.window.isDestroyed() };
+      }
+      const { window, contents, id, pid } = mediaFault;
+      assert.equal(window.isDestroyed(), false);
+      assert.equal(window.getParentWindow(), service);
+      const closed = new Promise(resolve => window.once('closed', resolve));
+      let evidence;
+      if (activeMode === 'renderer-loss') {
+        const gone = new Promise(resolve => contents.once('render-process-gone', (_event, details) => resolve(details.reason)));
+        contents.forcefullyCrashRenderer();
+        evidence = { reason: await bounded(gone, 'actual provider renderer termination') };
+        assert.ok(['crashed', 'killed'].includes(evidence.reason));
+      } else {
+        const navigated = new Promise(resolve => contents.once('did-start-navigation', (_event, _url, inPage, isMainFrame) =>
+          resolve({ inPage, isMainFrame })));
+        mediaFault.navigation = window.loadURL(providerOrigin + '/webrtc/?lifetime-document-replacement=1#/login');
+        mediaFault.navigation.catch(() => {});
+        evidence = await bounded(navigated, 'actual provider main-document navigation');
+        assert.equal(evidence.isMainFrame, true);
+        assert.equal(evidence.inPage, false);
+      }
+      if (activeMode === 'document-close-failure') {
+        assert.ok(mediaFault.closeError, 'The destroy boundary must have thrown the real injected Electron error');
+        assert.equal(window.isDestroyed(), false, 'A rejected close must remain honestly unconfirmed');
+        return { id, pid, ...evidence, destroyed: false, closeError: mediaFault.closeError,
+          serviceAlive: !service.isDestroyed() && !service.webContents.isCrashed() };
+      }
+      await bounded(closed, 'failed provider window closure');
+      return { id, pid, ...evidence, destroyed: window.isDestroyed(),
+        serviceAlive: !service.isDestroyed() && !service.webContents.isCrashed() };
+    }
     if (request.action === 'reject-host-menu-cleanup') {
       assert.equal(activeMode, 'exit-host-failure');
       const candidates = BrowserWindow.getAllWindows().filter(window => window !== service &&
@@ -851,10 +1146,12 @@ async function rendererProof(input) {
     throw new Error('Unknown verifier control request');
   });
   const results = [];
-  const modes = ['exit-idle', 'exit-cold-join', 'exit-registration', 'exit-ready',
+  const recoveryModes = ['renderer-loss', 'document-navigation', 'document-close-failure'];
+  const recoveryOnly = process.argv.includes('--recovery-only') || process.env.WELINK_QA_MEETING_RECOVERY_ONLY === '1';
+  const modes = recoveryOnly ? recoveryModes : ['exit-idle', 'exit-cold-join', 'exit-registration', 'exit-ready',
     'exit-pending-join', 'exit-host-failure', 'exit-browser-failure'];
-  if (!process.argv.includes('--exit-only') && process.env.WELINK_QA_MEETING_EXIT_ONLY !== '1')
-    modes.unshift('cold-unload', 'lifetime', 'ready');
+  if (!recoveryOnly && !process.argv.includes('--exit-only') && process.env.WELINK_QA_MEETING_EXIT_ONLY !== '1')
+    modes.unshift('cold-unload', 'lifetime', 'ready', ...recoveryModes);
   try {
     for (const mode of modes) {
       activeMode = mode;
@@ -866,9 +1163,9 @@ async function rendererProof(input) {
       service.webContents.on('render-process-gone', (_event, details) => crashes.push(details.reason));
       await service.loadFile(path.join(appRoot, 'plugin/conference/dist/hwmService.html'));
       const input = { app: appRoot, profile: path.join(root, 'profile'), logs: path.join(root, 'logs'), mode,
-        origin: ['ready', 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(mode) ? providerOrigin : ORIGIN };
+        origin: ['ready', ...recoveryModes, 'exit-ready', 'exit-pending-join', 'exit-host-failure'].includes(mode) ? providerOrigin : ORIGIN };
       const result = await bounded(service.webContents.executeJavaScript(
-        '(' + rendererProof.toString() + ')(' + JSON.stringify(input) + ')'), mode, 90000);
+        '(' + rendererProof.toString() + ')(' + JSON.stringify(input) + ')'), mode, recoveryModes.includes(mode) ? 150000 : 90000);
       if (mode !== 'cold-unload') {
         const contents = service.webContents;
         const unload = new Promise((resolve, reject) => {
@@ -883,6 +1180,7 @@ async function rendererProof(input) {
       } else service.close();
       assert.deepEqual(crashes, []);
       results.push(result);
+      releaseMediaFault();
       service = null;
     }
     const cleanup = await bounded(disposeBroker(), 'real main broker cleanup');
@@ -920,18 +1218,22 @@ async function rendererProof(input) {
         assert.equal(item.reason, 'requested-dispose');
         assert.equal(reply.error.code, 'BROWSER_CREDENTIALS_UNAVAILABLE');
         assert.ok(offlineReceipts.some(expected => JSON.stringify(receipt) === JSON.stringify(expected)),
-          'Only exact cancelled-navigation receipts asserted in the renderer are expected');
+          'Only exact absent-document receipts asserted in the renderer are expected');
         ++expectedOfflineFailures;
       }
     }
     assert.equal(expectedHostFailures, failedHosts.length);
     assert.equal(expectedOfflineFailures, offlineReceipts.length,
-      'Only intentionally cancelled provider navigation may have an unconfirmed inventory');
-    console.log(JSON.stringify({ passed: true, app: appRoot, syntheticProfile: root,
+      'Only intentionally retired documents may have an unconfirmed inventory');
+    const report = { passed: true, app: appRoot, syntheticProfile: root,
       blockedNetworkRequests, originalProviderResponses: fixtureResponses, fabricatedReadyEvents: 0,
-      expectedOfflineFailures, expectedHostFailures, hostCleanupFaults, cleanup, results }));
+      expectedOfflineFailures, expectedHostFailures, hostCleanupFaults, cleanup, results };
+    if (process.env.WELINK_TEST_OUTPUT)
+      fs.writeFileSync(path.join(process.env.WELINK_TEST_OUTPUT, 'result.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+    console.log(JSON.stringify(report));
   } finally {
     if (held) { held({ cancel: true }); held = null; }
+    releaseMediaFault();
     ipcMain.removeHandler(CONTROL);
     if (service && !service.isDestroyed()) service.destroy();
     await disposeBroker();

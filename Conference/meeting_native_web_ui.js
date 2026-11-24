@@ -4,13 +4,13 @@
  *   participant_detail and vote; logout retains custom invitations and hidden
  *   vote but disables participant_detail. Module 31 customButtonStatus computes
  *   room eligibility; that account/tenant/booking computation stays in the app.
- * - webrtc-main.6297930e.js: 12646.setCustomerButton, 13903.BUTTON_POS_TYPES,
+ * - main.3ee85ed7.js: 12646.setCustomerButton, 13903.BUTTON_POS_TYPES,
  *   4504.openEmitter/OPEN_EVENT_LIST, 53232.clickCustomerButton observer,
  *   17837/97944 hwCloudMeeting.getSupportCustomCapabilities()/inviteUsers().
- * - https://meeting.huaweicloud.com/webrtc/static/js/404.58f826ce.chunk.js,
- *   module 78330: Ac/Dc consume {buttonId,desc:{zh,en},eventName,buttonPos};
+ * - https://meeting.huaweicloud.com/webrtc/static/js/606.616fb575.chunk.js,
+ *   module 38120 consumes {buttonId,desc:{zh,en},eventName,buttonPos};
  *   exactly one position "1" button, any number at position "0" in More.
- *   Jl/Fr render #control-banner-vote and generated CONTROL invite/feedback
+ *   The control components render vote and generated invite/feedback controls
  *   button classes via module 70781.setUniqueId(LOCATION.CONTROL,name,TYPE.BUTTON).
  *   Te renders .attendees-name-title with id "attendees-name-title-" + pid.
  *   Those selectors cover normal, fullscreen, detached and rerendered PC UI.
@@ -49,8 +49,8 @@
  * returns JSON.stringify({inviteThirdUser:true}) when this bridge is installed.
  * Before initial enforcement, await loadModule.e(702): the pinned
  * 702.07faf52f.chunk.js directly defines dependency-free module 70781.
- * All other required helper modules are in main. The provider itself loads its
- * desktop route 19641 using [382,686,983,702,404,641]; do not render it here.
+ * All other required helper modules are in main. The provider owns desktop-route
+ * loading and rendering; do not render it here.
  * No native config completion, numeric notify or DLL command is manufactured.
  *
  * emit('ui-custom-click', {buttonId,sessionKey,conferenceID,displayConferenceID?,

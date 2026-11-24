@@ -1,13 +1,13 @@
 /* MAIN-world, rendered watermark enforcement for the pinned web meeting runtime.
  *
- * Source evidence: webrtc-main.6297930e.js module 40904 implements DOM fullscreen;
+ * Source evidence: main.3ee85ed7.js module 40904 implements DOM fullscreen;
  * 65113/52231 dispatch it with {element}; 7283 opens external portal/record pages.
- * React portals render ordinary document UI. Neither that bundle nor
- * hrtc-12.eb3d2838.js implements a watermark renderer (supportWatermark is only
- * metadata; error 12051015 explicitly describes the unsupported web version).
- * The inspected official Linux preload maps provide no watermark binding.
- * This is consequently a rendered adapter, NOT a vendor/server capability ACK.
- * It never advertises supportWatermark, sends a guessed command, or captures media.
+ * React portals render ordinary document UI. Provider policy metadata and any
+ * provider-rendered watermark remain independent of this adapter's enforcement.
+ * The inspected official Linux preload maps provide no native watermark binding.
+ * This is a rendered adapter, NOT a vendor/server capability acknowledgement.
+ * It never advertises supportWatermark, sends a guessed command, captures media,
+ * or disables a watermark imposed by the provider.
  *
  * __welinkCreateNativeWatermark({onViolation}) -> synchronous methods:
  *   configure({content, color}) -> state. Only content === '' explicitly disables.

@@ -29,6 +29,8 @@
  * isolated session locally even when revocation fails. Its serverLogout report
  * distinguishes confirmed HTTP 200, native-owned tokens and unconfirmed logout.
  * Native logout remains the parent's responsibility; credentials never leave main.
+ * Renderer loss retires the owned document and reports browser cleanup without
+ * claiming a remote leave. Recovery requires a new explicit initialization.
  * Do not log requests, callback payloads or URLs: they can contain credentials.
  */
 const { EventEmitter } = require('events');
@@ -184,6 +186,7 @@ class MeetingNativeWeb extends EventEmitter {
       'meeting_custom_background_policy.js', 'meeting_custom_background.js',
       'meeting_sdk_log_catalog.js', 'meeting_sdk_log_runtime.js',
       'meeting_moderation_capabilities.js', 'meeting_moderation_capabilities_web.js',
+      'meeting_audio_output.js',
       'meeting_native_web_recording_control.js', 'meeting_native_capabilities.js', 'meeting_native_web_runtime.js']
       .map(name => fs.readFileSync(path.join(__dirname, name), 'utf8')).join('\n;\n');
     this.management = typeof this.options.getManagementConfig === 'function' ? createManagementTransport({
@@ -253,16 +256,28 @@ class MeetingNativeWeb extends EventEmitter {
       throw failure('MEDIA_OWNER_CHANGED', 'The media request belongs to a retired browser session');
   }
 
-  scheduleGuestRetirement(owner = this.mediaOwner) {
-    if (owner.origin === this.origin || owner.retirement || owner.retired || this.disposed || this.loggingOut) return;
-    const task = this.serial.then(async () => {
+  scheduleBrowserRetirement(owner = this.mediaOwner, source = 'guest-session-cleanup', errors = []) {
+    const lostDocument = source === 'media-session-cleanup';
+    if ((!lostDocument && owner.origin === this.origin) || owner.retirement || owner.retired || this.disposed || this.loggingOut) return;
+    const window = lostDocument ? this.window : null;
+    const task = Promise.allSettled([this.serial, this.initializing]).then(async () => {
+      if (owner.retired && errors.length) {
+        // A failed close cannot run idle-session cleanup or authorize a new
+        // document. Keep the actual failure visible even if later disposal has
+        // already closed the window; this retirement attempt was incomplete.
+        this.emit('event', { protocol: PROTOCOL, instance: this.instance, event: source,
+          data: { localCleanup: { window: window && window.isDestroyed() ? 'closed' : 'failed' },
+            localCleanupComplete: false, errors: [...errors] } });
+        return;
+      }
       if (owner !== this.mediaOwner || owner.retired || this.disposed || this.loggingOut) return;
       const report = await this.retireIdleBrowserSession(owner);
-      this.emit('event', { protocol: PROTOCOL, instance: this.instance,
-        event: 'guest-session-cleanup', data: report });
+      if (window && window.isDestroyed()) report.localCleanup.window = 'closed';
+      report.errors.unshift(...errors);
+      this.emit('event', { protocol: PROTOCOL, instance: this.instance, event: source, data: report });
     }).catch(error => {
-      this.emit('event', { protocol: PROTOCOL, instance: this.instance, event: 'guest-session-cleanup',
-        data: { errors: [this.publicLogoutError(error, 'guest-session-cleanup')] } });
+      this.emit('event', { protocol: PROTOCOL, instance: this.instance, event: source,
+        data: { localCleanupComplete: false, errors: [...errors, this.publicLogoutError(error, source)] } });
     }).finally(() => { owner.retirement = null; });
     owner.retirement = task;
     this.serial = task.catch(() => {});
@@ -471,6 +486,21 @@ class MeetingNativeWeb extends EventEmitter {
   }
 
   engineUnavailable(reason) {
+    const lostDocument = reason === 'document-navigation' || reason === 'renderer-gone';
+    const window = this.window;
+    const retirementErrors = [];
+    this.ready = null;
+    this.allowedPermissions.clear();
+    this.cancelScreenStart();
+    if (lostDocument) {
+      // Retire queued admission/policy work before closing the old document.
+      // The existing cleanup path owns token revocation and its honest receipt;
+      // it never substitutes window loss for a confirmed conference leave.
+      ++this.ownerEpoch;
+      ++this.policyEpoch;
+      this.cancelManagementRequests();
+      this.scheduleBrowserRetirement(this.mediaOwner, 'media-session-cleanup', retirementErrors);
+    }
     this.renderSurfaceHost?.stop('RENDER_ENGINE_RETIRED').catch(() => {});
     this.p2pMini.restore();
     this.incomingInvite.cancel();
@@ -478,12 +508,23 @@ class MeetingNativeWeb extends EventEmitter {
     if (voice) voice.filter.stop().catch(() => console.warn('Native voice process retirement unconfirmed'));
     if (this.mediaOwner.anonymous) {
       this.anonymousVoice.retire(this.mediaOwner).catch(() => console.warn('Anonymous voice deletion unconfirmed'));
-      // A new document must never inherit the old room's microphone grant.
-      this.allowedPermissions.clear();
-      if (['document-navigation', 'renderer-gone'].includes(reason) && this.window && !this.window.isDestroyed())
-        this.window.destroy();
     }
-    this.ready = null;
+    if (lostDocument && window && !window.isDestroyed()) {
+      try {
+        window.destroy();
+        if (!window.isDestroyed())
+          throw failure('WINDOW_CLOSE_UNCONFIRMED', 'The failed meeting window did not close');
+      } catch (error) {
+        if (!window.isDestroyed()) {
+          // A live window which refused destruction is no longer a trusted
+          // media document. Existing owner checks revoke IPC, delayed permission
+          // grants and browser requests until explicit cleanup confirms closure.
+          this.mediaOwner.retired = true;
+          this.retiring = true;
+        }
+        retirementErrors.push(this.publicLogoutError(error, 'window-retirement'));
+      }
+    }
     for (const controller of this.recordingPermissionPrompts) controller.abort();
     for (const request of this.invitedCaptureRequests.values()) request.controller.abort();
     if (this.recordingRequests.size) {
@@ -498,6 +539,8 @@ class MeetingNativeWeb extends EventEmitter {
   async initialize(entryRoute = '/login') {
     if (this.disposed) throw failure('DISPOSED', 'The meeting bridge was disposed');
     if (this.retiring || this.loggingOut) throw failure('SESSION_LOGOUT_IN_PROGRESS', 'The browser meeting session is being cleared');
+    if (this.mediaOwner.retirement)
+      throw failure('ENGINE_NOT_READY', 'The failed media document is still being retired');
     if (this.ready) return this.ready;
     if (this.initializing) return this.initializing;
     const task = this.initializeWindow(entryRoute).finally(() => {
@@ -585,13 +628,13 @@ class MeetingNativeWeb extends EventEmitter {
       this.webToken = '';
       this.userInfo = null;
       this.engineUnavailable('window-closed');
-      this.scheduleGuestRetirement(owner);
+      this.scheduleBrowserRetirement(owner);
     });
     try {
       const url = new URL('/webrtc/', owner.origin);
       url.searchParams.set('lang', this.options.language === 'en-US' ? 'en-US' : 'zh-CN');
       url.hash = entryRoute;
-      await window.loadURL(url.href);
+      await this.runMediaRequest(window, () => window.loadURL(url.href));
       this.requireMediaOwner(owner, window);
       if (owner.anonymous) await this.anonymousVoice.attach({ owner, window,
         isCurrent: () => this.mediaOwner === owner && !owner.retired && this.window === window &&
@@ -600,7 +643,7 @@ class MeetingNativeWeb extends EventEmitter {
         getState: () => this.lastMediaState?.voiceProtection });
       if (this.disposed || this.retiring || this.loggingOut)
         throw failure('SESSION_LOGOUT_IN_PROGRESS', 'Meeting initialization was retired');
-      await window.webContents.executeJavaScript(this.runtimeSource);
+      await this.runMediaRequest(window, () => window.webContents.executeJavaScript(this.runtimeSource));
       this.requireMediaOwner(owner, window);
       const session = this.voiceSession();
       this.voiceRequested = !!session?.requested();
@@ -641,6 +684,29 @@ class MeetingNativeWeb extends EventEmitter {
     }
   }
 
+  async runMediaRequest(window, action) {
+    // Electron can leave an executeJavaScript promise pending when its renderer
+    // dies. Settle our request on the existing engine lifecycle, while retaining
+    // a rejection handler on the underlying operation and rejecting late replies.
+    const owner = this.mediaOwner;
+    let unavailable;
+    const retired = new Promise((_, reject) => {
+      unavailable = message => {
+        if (message.event === 'engine-unavailable')
+          reject(failure('MEDIA_OWNER_CHANGED', 'The media document was retired while its operation was pending'));
+      };
+      this.on('engine', unavailable);
+    });
+    try {
+      const result = await Promise.race([Promise.resolve().then(() => {
+        this.requireMediaOwner(owner, window);
+        return action();
+      }), retired]);
+      this.requireMediaOwner(owner, window);
+      return result;
+    } finally { this.removeListener('engine', unavailable); }
+  }
+
   callPage(operation, params = {}) {
     const owner = this.mediaOwner;
     const window = this.window;
@@ -655,7 +721,7 @@ class MeetingNativeWeb extends EventEmitter {
     const invocation = 'window.__welinkNativeMeeting.invoke(' + JSON.stringify(operation) + ',' + JSON.stringify(params) + ')';
     const userGesture = ['conference.join', 'conference.joinAnonymous', 'conference.joinLink',
       'audio.setEnabled', 'video.setEnabled', 'screen.start', 'recording.start', 'device.select'].includes(operation);
-    return window.webContents.executeJavaScript(invocation, userGesture)
+    return this.runMediaRequest(window, () => window.webContents.executeJavaScript(invocation, userGesture))
       .then(reply => {
         this.requireMediaOwner(owner, window);
         if (originOf(window.webContents.getURL()) !== owner.origin)
@@ -815,7 +881,7 @@ class MeetingNativeWeb extends EventEmitter {
       }
       if (name === 'recording-state') data = this.recordingResult(data);
       this.emit('event', { protocol: PROTOCOL, instance: this.instance, event: name, data });
-      if (name === 'meeting-lifecycle' && data?.state === 'left') this.scheduleGuestRetirement();
+      if (name === 'meeting-lifecycle' && data?.state === 'left') this.scheduleBrowserRetirement();
       if (name === 'meeting-lifecycle' && data?.state === 'left' && owner.anonymous)
         await this.anonymousVoice.retire(owner);
       return;
@@ -2159,6 +2225,7 @@ class MeetingNativeWeb extends EventEmitter {
       params = admission.params;
     }
     const requestOwner = this.mediaOwner;
+    const initializationRetirement = operation === 'initialize' ? requestOwner.retirement : null;
     const ownerEpoch = this.ownerEpoch;
     if (operation === 'conference.joinOffline') {
       if (!this.offline) return Promise.reject(failure('OFFLINE_PROVIDER_MISSING', 'The conference service has no offline configuration'));
@@ -2321,6 +2388,11 @@ class MeetingNativeWeb extends EventEmitter {
         return this.meetingServices.execute(operation, params);
       }
       this.requireOwnerEpoch(ownerEpoch);
+      // An explicit initialize submitted after document loss waits behind its
+      // actual cleanup. Only that request may adopt the replacement owner; work
+      // admitted before the loss still fails the captured epoch above.
+      if (initializationRetirement && requestOwner.retired && operation === 'initialize')
+        return this.initialize();
       this.requireMediaOwner(requestOwner);
       if (operation === 'initialize') return this.initialize();
       if (operation === 'conference.joinAnonymous' || operation === 'conference.joinLink') {

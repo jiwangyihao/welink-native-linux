@@ -2,7 +2,7 @@
  * offline control. Windows 100.10.5 tup_confctrl.dll: uportal_SetClientCapabilities
  * RVA 0x6D990 stores cohost/waiting/mic/camera-open/camera-close at +0,+12,+16,+20,+32;
  * RVA 0x269D0 appends "1", ",4", ",10", ",11", ",12" respectively. The last
- * four also match WebRTC main.6297930e module 62467 CLIENT_CAPABILITIES.
+ * four also match WebRTC main.3ee85ed7 module 62467 CLIENT_CAPABILITIES.
  * These are membership advertisements, not permissions or server receipts.
  */
 (function (root) {

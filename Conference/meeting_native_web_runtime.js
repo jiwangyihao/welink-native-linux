@@ -6,7 +6,7 @@
 (() => {
   'use strict';
   if (window.__welinkNativeMeeting) return;
-  const ABI_ASSET = '/webrtc/static/js/main.6297930e.js';
+  const ABI_ASSET = '/webrtc/static/js/main.3ee85ed7.js';
   const SDK_VERSION = '1.10.96';
   const MODULE = Object.freeze({ store: 36176, selectors: 53765, constants: 62467,
     actions: 65113, view: 491, sharing: 55375, rtc: 69062, sdk: 91012,
@@ -1231,6 +1231,7 @@
     for (const name of ['checkSystemRequirements', 'getDevices', 'createClient', 'createStream', 'isScreenShareSupported']) requireFunction(sdk, name);
     if (sdk.VERSION !== SDK_VERSION)
       fail('VENDOR_ABI_MISMATCH', 'The verified Huawei media engine must be HRTC ' + SDK_VERSION);
+    requireFunction(window.WelinkAudioOutput, 'apply');
     if (options.sdkLog && !sdkLog) sdkLog = window.__welinkInstallSdkLog(sdk, host.writeSdkLog);
     requireFunction(vendor.selectors, 'selectInviteToJoinInfo');
     requireFunction(vendor.selectors, 'selectIsJoiningConf');
@@ -1738,31 +1739,66 @@
     pulse();
     return snapshot();
   }
+  function speakerOutputs(media) {
+    const outputs = new Set();
+    const streams = new Set(Object.values(media.remoteStreams || {}));
+    if (media.remoteAuxStream) streams.add(media.remoteAuxStream);
+    for (const stream of streams) {
+      requireFunction(stream, 'getAudioHRTCTrack');
+      const track = stream.getAudioHRTCTrack();
+      // Pinned HRTC 1.10.96 uses this real player element; its wrapper drops
+      // the setSinkId promise and advances a cache before routing completes.
+      if (track?.player_?.playerElement_) outputs.add(track.player_.playerElement_);
+    }
+    const topN = media.rtcClient.audioStreams4TopN;
+    requireFunction(topN, 'getAudioStreams');
+    const incoming = topN.getAudioStreams();
+    if (!Array.isArray(incoming)) fail('VENDOR_ABI_MISMATCH', 'The HRTC top-N audio players are unavailable');
+    for (const stream of incoming) if (stream.audiotag) outputs.add(stream.audiotag);
+    return Array.from(outputs);
+  }
   async function selectDevice(params) {
     if (moderation && ['audioinput', 'videoinput'].includes(params?.kind)) moderation.deviceChanged();
     const list = await devices();
     if (!params || !list.some(device => device.kind === params.kind && device.deviceId === params.deviceId))
       fail('DEVICE_NOT_FOUND', 'The requested device is not in the real device enumeration');
     const actions = vendor.actions;
-    if (!snapshot().joined) {
+    const before = snapshot();
+    if (!before.joined) {
       const setter = { audioinput: 'setMicroPhoneDevice', audiooutput: 'setSpeakerDevice', videoinput: 'setVideoInputDevice' }[params.kind];
       if (!setter) fail('INVALID_DEVICE_KIND', 'Unsupported media device kind');
       requireFunction(actions, setter);
       vendor.store.dispatch(actions[setter](params.deviceId));
       return { selection: snapshot().selectedDevices, active: false };
     }
+    const media = rtc(), client = media.rtcClient;
+    const ensureCurrent = () => {
+      const current = snapshot();
+      if (rtc().rtcClient !== client || !current.joined || current.sessionKey !== before.sessionKey)
+        fail('CONFERENCE_CHANGED', 'The device operation no longer belongs to the current media session');
+    };
+    let routing;
     if (params.kind === 'audiooutput') {
+      const outputs = speakerOutputs(media);
+      routing = await window.WelinkAudioOutput.apply({ elements: outputs, deviceId: params.deviceId, ensureCurrent });
+      // Commit the provider preference/cache only after actual media sinks
+      // completed. The SDK may repeat the now-idempotent setSinkId call.
       await run(vendor.view.setAudioOutPut, params.deviceId);
-      const client = rtc().rtcClient;
       requireFunction(client, 'setAudioOutput4TopThree');
       await client.setAudioOutput4TopThree(params.deviceId);
+      ensureCurrent();
+      const currentOutputs = speakerOutputs(rtc());
+      if (currentOutputs.length !== outputs.length || currentOutputs.some(element => !outputs.includes(element) || element.sinkId !== params.deviceId))
+        fail('AUDIO_OUTPUT_CHANGED', 'Receiving audio players changed during selection; refresh before applying again');
     } else {
       const deviceType = params.kind === 'audioinput' ? vendor.constants.MEDIA_TYPE.AUDIO : vendor.constants.MEDIA_TYPE.VIDEO;
       await run(vendor.view.switchDevice, { payload: { deviceType, device: params.deviceId } });
     }
+    ensureCurrent();
     if (snapshot().selectedDevices[params.kind] !== params.deviceId)
       fail('DEVICE_SELECTION_FAILED', 'The actual SDK did not retain the selected device');
-    return { selection: snapshot().selectedDevices, active: true };
+    return { selection: snapshot().selectedDevices, active: routing ? routing.verified : true,
+      ...(routing ? { routing } : {}) };
   }
   function screenPermission() {
     const current = sharingContext();

@@ -1,4 +1,4 @@
-/* Policy-only observer for main.6297930e.js modules 15300/33556/62467.
+/* Policy-only observer for main.3ee85ed7.js modules 15300/33556/62467.
  * Observe the genuine application request, never issue one or change its result.
  * The ordinary support selector intentionally collapses 'forced' and 'enable';
  * it must never authorize a custom image without the underlying provider flags.

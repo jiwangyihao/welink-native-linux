@@ -8,8 +8,12 @@
  * The Windows dispatcher has no implementation for data migration (14/15);
  * those commands are rejected rather than reporting a completed migration.
  * Commands and response fields were recovered from the original DLL and JS.
+ * ZIP totals/current positions count regular files, not directories. Command 2
+ * reports clean EOF with end_of_archive:true and no file_stream; file responses
+ * have end_of_archive:false. Consumers must handle EOF before parsing JSONL.
  */
 #define _GNU_SOURCE
+#define _FILE_OFFSET_BITS 64
 #include "native_rpc.h"
 #include "im_transport_dispatch.h"
 #include <archive.h>
@@ -28,7 +32,9 @@ struct zip_reader {
     struct zip_reader *next;
     char *path;
     struct archive *archive;
+    int fd;
     int64_t total, current;
+    uint64_t total_entries, current_entries;
 };
 struct tools_job { struct native_request request; };
 static GMutex lifecycle;
@@ -114,19 +120,148 @@ static int copy_file(const char *source, const char *destination)
     return result;
 }
 
-static struct archive *zip_open_reader(const char *path, const char *password)
+static uint16_t zip_u16(const unsigned char *p)
 {
+    return (uint16_t)p[0] | (uint16_t)p[1] << 8;
+}
+
+static uint32_t zip_u32(const unsigned char *p)
+{
+    return (uint32_t)zip_u16(p) | (uint32_t)zip_u16(p + 2) << 16;
+}
+
+static uint64_t zip_u64(const unsigned char *p)
+{
+    return (uint64_t)zip_u32(p) | (uint64_t)zip_u32(p + 4) << 32;
+}
+
+static gboolean zip_read_at(int fd, void *buffer, size_t length, uint64_t offset)
+{
+    if (offset > INT64_MAX || length > (uint64_t)INT64_MAX - offset) return FALSE;
+    unsigned char *data = buffer;
+    while (length) {
+        if (is_cancelled()) return FALSE;
+        ssize_t n = pread(fd, data, length, (off_t)offset);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) return FALSE;
+        data += n;
+        offset += (uint64_t)n;
+        length -= (size_t)n;
+    }
+    return TRUE;
+}
+
+struct zip_directory {
+    uint64_t entries;
+    gboolean seekable;
+};
+
+static gboolean zip_check_directory(int fd, const unsigned char *end, uint64_t end_offset,
+                                    uint64_t file_size, struct zip_directory *directory)
+{
+    uint64_t entries = zip_u16(end + 10), size = zip_u32(end + 12), offset = zip_u32(end + 16);
+    uint64_t directory_end = end_offset, zip64_size = 0;
+    unsigned char locator[20], extended[56];
+    gboolean zip64 = end_offset >= sizeof locator &&
+        zip_read_at(fd, locator, sizeof locator, end_offset - sizeof locator) &&
+        !memcmp(locator, "PK\006\007", 4);
+    if (zip64) {
+        uint64_t location = zip_u64(locator + 8);
+        if (zip_u32(locator + 4) != 0 || zip_u32(locator + 16) != 1 ||
+            location > end_offset - sizeof locator ||
+            end_offset - sizeof locator - location < sizeof extended ||
+            !zip_read_at(fd, extended, sizeof extended, location) ||
+            memcmp(extended, "PK\006\006", 4)) return FALSE;
+        zip64_size = end_offset - sizeof locator - location;
+        if (zip_u64(extended + 4) != zip64_size - 12 ||
+            zip_u32(extended + 16) != 0 || zip_u32(extended + 20) != 0 ||
+            zip_u64(extended + 24) != zip_u64(extended + 32)) return FALSE;
+        entries = zip_u64(extended + 32);
+        size = zip_u64(extended + 40);
+        offset = zip_u64(extended + 48);
+        directory_end = location;
+        if ((zip_u16(end + 4) != 0 && zip_u16(end + 4) != UINT16_MAX) ||
+            (zip_u16(end + 6) != 0 && zip_u16(end + 6) != UINT16_MAX) ||
+            (zip_u16(end + 8) != UINT16_MAX && zip_u16(end + 8) != entries) ||
+            (zip_u16(end + 10) != UINT16_MAX && zip_u16(end + 10) != entries) ||
+            (zip_u32(end + 12) != UINT32_MAX && zip_u32(end + 12) != size) ||
+            (zip_u32(end + 16) != UINT32_MAX && zip_u32(end + 16) != offset)) return FALSE;
+    } else if (zip_u16(end + 4) != 0 || zip_u16(end + 6) != 0 ||
+               zip_u16(end + 8) != entries) return FALSE;
+
+    /* Match libarchive's adjustment for ZIPs with a prepended executable.
+     * The declared directory must fit before its end record, and its physical
+     * extent must contain exactly the declared number of complete headers.
+     * libarchive's seekable parser itself does not enforce these two fields. */
+    if (size > directory_end || offset > directory_end - size || entries > size / 46) return FALSE;
+    uint64_t cursor = directory_end - size;
+    for (uint64_t i = 0; i < entries; ++i) {
+        unsigned char header[46];
+        if (directory_end - cursor < sizeof header ||
+            !zip_read_at(fd, header, sizeof header, cursor) ||
+            memcmp(header, "PK\001\002", 4)) return FALSE;
+        uint64_t length = sizeof header + (uint64_t)zip_u16(header + 28) +
+            zip_u16(header + 30) + zip_u16(header + 32);
+        if (length > directory_end - cursor) return FALSE;
+        cursor += length;
+    }
+    if (cursor != directory_end) {
+        unsigned char signature[6];
+        if (directory_end - cursor < sizeof signature ||
+            !zip_read_at(fd, signature, sizeof signature, cursor) ||
+            memcmp(signature, "PK\005\005", 4) ||
+            directory_end - cursor != sizeof signature + (uint64_t)zip_u16(signature + 4)) return FALSE;
+    }
+    directory->entries = entries;
+    /* 3.7.4's seekable bidder searches only the final 16 KiB and excludes its
+     * first byte. Use streaming only after validating the whole directory for
+     * the valid empty/long-comment/extended-ZIP64 cases that bidder cannot see. */
+    uint64_t tail_start = file_size > 16384 ? file_size - 16384 : 0;
+    directory->seekable = end_offset > tail_start &&
+        (!zip64 || (end_offset - tail_start >= sizeof locator && zip64_size <= 16384));
+    return TRUE;
+}
+
+static gboolean zip_read_directory(int fd, struct zip_directory *directory)
+{
+    struct stat st;
+    if (fstat(fd, &st) || st.st_size < 22) return FALSE;
+    unsigned char tail[22 + 65535];
+    size_t length = st.st_size > (off_t)sizeof tail ? sizeof tail : (size_t)st.st_size;
+    uint64_t start = (uint64_t)st.st_size - length;
+    if (!zip_read_at(fd, tail, length, start)) return FALSE;
+    for (size_t offset = length - 22;; --offset) {
+        if (!memcmp(tail + offset, "PK\005\006", 4) &&
+            length - offset - 22 == zip_u16(tail + offset + 20) &&
+            zip_check_directory(fd, tail + offset, start + offset, (uint64_t)st.st_size, directory)) return TRUE;
+        if (!offset) break;
+    }
+    return FALSE;
+}
+
+static struct archive *zip_open_reader(const char *path, const char *password, int *fd, uint64_t *entries)
+{
+    int input = open(path, O_RDONLY | O_CLOEXEC);
+    if (input < 0) return NULL;
+    struct zip_directory directory;
+    if (!zip_read_directory(input, &directory)) { close(input); return NULL; }
     struct archive *archive = archive_read_new();
-    if (!archive) return NULL;
-    archive_read_support_format_zip(archive);
+    if (!archive) { close(input); return NULL; }
+    if (directory.seekable) archive_read_support_format_zip_seekable(archive);
+    else archive_read_support_format_zip_streamable(archive);
     if (*password && archive_read_add_passphrase(archive, password) != ARCHIVE_OK) {
         archive_read_free(archive);
+        close(input);
         return NULL;
     }
-    if (archive_read_open_filename(archive, path, 65536) != ARCHIVE_OK) {
+    if (archive_read_open_fd(archive, input, 65536) != ARCHIVE_OK) {
         archive_read_free(archive);
+        close(input);
         return NULL;
     }
+    /* archive_read_open_fd borrows the descriptor; zip_close owns its close. */
+    *fd = input;
+    *entries = directory.entries;
     return archive;
 }
 
@@ -142,6 +277,7 @@ static void zip_close(struct zip_reader **position)
     struct zip_reader *reader = *position;
     *position = reader->next;
     archive_read_free(reader->archive);
+    close(reader->fd);
     g_free(reader->path);
     g_free(reader);
 }
@@ -159,20 +295,36 @@ static void zip_command(struct native_request *request)
     }
     if (request->cmd == 1) {
         const char *password = string_value(request->param, "password");
-        struct archive *archive = zip_open_reader(path, password);
+        int fd;
+        uint64_t expected, entries = 0;
+        struct archive *archive = zip_open_reader(path, password, &fd, &expected);
         if (!archive) { respond(request, 1, NULL); return; }
         int64_t count = 0;
         struct archive_entry *entry;
         int status;
         while ((status = archive_read_next_header(archive, &entry)) == ARCHIVE_OK) {
-            ++count;
+            if (++entries > expected) { status = ARCHIVE_FATAL; break; }
+            if (archive_entry_filetype(entry) == AE_IFREG) ++count;
+            else if (archive_entry_filetype(entry) != AE_IFDIR) {
+                status = ARCHIVE_FATAL;
+                break;
+            }
             if (is_cancelled() || archive_read_data_skip(archive) != ARCHIVE_OK) {
                 status = ARCHIVE_FATAL;
                 break;
             }
         }
         archive_read_free(archive);
-        if (status != ARCHIVE_EOF || !(archive = zip_open_reader(path, password))) {
+        close(fd);
+        if (status != ARCHIVE_EOF || entries != expected) {
+            respond(request, 1, NULL);
+            return;
+        }
+        archive = zip_open_reader(path, password, &fd, &expected);
+        if (!archive) { respond(request, 1, NULL); return; }
+        if (entries != expected) {
+            archive_read_free(archive);
+            close(fd);
             respond(request, 1, NULL);
             return;
         }
@@ -180,7 +332,9 @@ static void zip_command(struct native_request *request)
         struct zip_reader *reader = g_new0(struct zip_reader, 1);
         reader->path = g_strdup(path);
         reader->archive = archive;
+        reader->fd = fd;
         reader->total = count;
+        reader->total_entries = entries;
         reader->next = zip_readers;
         zip_readers = reader;
         struct json_object *param = json_object_new_object();
@@ -193,18 +347,46 @@ static void zip_command(struct native_request *request)
     if (!reader) { respond(request, 1, NULL); return; }
     struct archive_entry *entry;
     int status;
-    do {
+    struct zip_directory directory;
+    for (;;) {
         status = archive_read_next_header(reader->archive, &entry);
-        if (status != ARCHIVE_OK) { respond(request, 1, NULL); return; }
-        ++reader->current;
-    } while (archive_entry_filetype(entry) == AE_IFDIR);
+        if (status == ARCHIVE_EOF && reader->current == reader->total &&
+            reader->current_entries == reader->total_entries && !is_cancelled() &&
+            zip_read_directory(reader->fd, &directory) && directory.entries == reader->total_entries) {
+            struct json_object *param = json_object_new_object();
+            json_object_object_add(param, "file_path", json_object_new_string(path));
+            json_object_object_add(param, "total_num", json_object_new_int64(reader->total));
+            json_object_object_add(param, "cur_num", json_object_new_int64(reader->current));
+            json_object_object_add(param, "end_of_archive", json_object_new_boolean(TRUE));
+            respond(request, 0, param);
+            return;
+        }
+        if (status != ARCHIVE_OK || is_cancelled()) {
+            zip_close(position);
+            respond(request, 1, NULL);
+            return;
+        }
+        if (++reader->current_entries > reader->total_entries) {
+            zip_close(position);
+            respond(request, 1, NULL);
+            return;
+        }
+        if (archive_entry_filetype(entry) != AE_IFDIR) break;
+        if (archive_read_data_skip(reader->archive) != ARCHIVE_OK) {
+            zip_close(position);
+            respond(request, 1, NULL);
+            return;
+        }
+    }
     la_int64_t size = archive_entry_size(entry);
-    if (size < 0 || size > INT_MAX || archive_entry_filetype(entry) != AE_IFREG) {
+    if (size < 0 || size > INT_MAX || archive_entry_filetype(entry) != AE_IFREG ||
+        reader->current >= reader->total) {
+        zip_close(position);
         respond(request, 1, NULL);
         return;
     }
     char *data = g_try_malloc((size_t)size + 1);
-    if (!data) { respond(request, 1, NULL); return; }
+    if (!data) { zip_close(position); respond(request, 1, NULL); return; }
     size_t length = 0;
     while (length < (size_t)size && !is_cancelled()) {
         la_ssize_t n = archive_read_data(reader->archive, data + length, (size_t)size - length);
@@ -214,15 +396,18 @@ static void zip_command(struct native_request *request)
     char extra;
     if (length != (size_t)size || archive_read_data(reader->archive, &extra, 1) != 0 || is_cancelled()) {
         g_free(data);
+        zip_close(position);
         respond(request, 1, NULL);
         return;
     }
     data[length] = 0;
+    ++reader->current;
     struct json_object *param = json_object_new_object();
     json_object_object_add(param, "file_path", json_object_new_string(path));
     json_object_object_add(param, "file_stream", json_object_new_string_len(data, (int)length));
     json_object_object_add(param, "total_num", json_object_new_int64(reader->total));
     json_object_object_add(param, "cur_num", json_object_new_int64(reader->current));
+    json_object_object_add(param, "end_of_archive", json_object_new_boolean(FALSE));
     g_free(data);
     respond(request, 0, param);
 }

@@ -1,4 +1,4 @@
-/* Actual WebRTC moderation consumers, pinned to main.6297930e modules
+/* Actual WebRTC moderation consumers, pinned to main.3ee85ed7 modules
  * 51361/86989 (CMS), 2500/491 (device invitation actions/workers), 58909
  * (ANSWER_MUTE/ANSWER_VIDEO), 7283 (host controls). CO_HOST/isCohost is the
  * Windows 100.10.5 tup_confctrl uportal_ApplyCoHost wire format (RVA 0x6DC80).
