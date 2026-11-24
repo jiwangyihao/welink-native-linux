@@ -1,0 +1,43 @@
+# Private vendor inputs and all generated runtimes remain local.
+.inputs/
+.work/
+releases/
+*.log
+__pycache__/
+*.pyc
+node_modules/
+NativeIntegration/lib/
+NativeIntegration/app-overrides/
+NativeBuild/json-c/
+NativeBuild/json-c-work/
+NativeBuild/ffi/output/
+NativeBuild/ffi/work/
+NativeBuild/ffi/archives/
+NativeBuild/electron-runtime/root/
+NativeBuild/electron-runtime/archives/
+vendor/
+!Conference/vendor/
+Conference/vendor/*
+!Conference/vendor/management/
+Conference/vendor/management/node_modules/
+# No profiles, caches, credentials, recordings or research databases.
+profile/
+profiles/
+*.key
+*.p12
+*.pfx
+*.db
+*.sqlite
+*.jsc
+*.exe
+*.dll
+*.so
+*.node
+*.gpr
+*.gbf
+# Optional original-SDK comparison data must be generated/supplied privately.
+LoginSecurity/pedestal_integrity_vendor.h
+**/analysis/*_reference.c
+**/analysis/*_recovered.c
+**/analysis/*.gpr
+**/analysis/*.rep/

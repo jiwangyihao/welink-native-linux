@@ -1,0 +1,8 @@
+#!/bin/bash
+# Real ia32 compiler entry for the recorded standalone C verification drivers.
+set -euo pipefail
+: "${WELINK_NATIVE_DEPS:?Set the isolated native dependency prefix}"
+compiler=${WELINK_NATIVE_CC:-${WELINK_ELECTRON_SOURCE:+$WELINK_ELECTRON_SOURCE/third_party/llvm-build/Release+Asserts/bin/}clang}
+exec "$compiler" \
+    --target=i686-linux-gnu --sysroot="$WELINK_NATIVE_DEPS/sysroot" \
+    --gcc-toolchain="$WELINK_NATIVE_DEPS/sysroot/usr" "$@"

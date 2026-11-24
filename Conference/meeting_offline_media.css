@@ -1,0 +1,38 @@
+.welink-offline-media {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 20px;
+  color: #e8edf3;
+  background: #17202c;
+  font: 15px/1.5 system-ui, sans-serif;
+}
+.welink-offline-media [role="status"] { min-height: 24px; }
+.offline-media-remote {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.offline-media-player {
+  height: 280px;
+  overflow: hidden;
+  background: #0b1119;
+  border: 1px solid #405064;
+  border-radius: 8px;
+}
+.offline-media-local { width: 280px; height: 158px; margin: 0 0 16px auto; }
+.offline-media-label { padding: 4px 8px; overflow-wrap: anywhere; }
+.offline-media-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; padding-top: 20px; }
+.offline-media-controls label { display: flex; flex-direction: column; gap: 4px; }
+.offline-media-controls button,
+.offline-media-controls select {
+  max-width: 260px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid #7b90aa;
+  border-radius: 5px;
+  color: #f4f6f9;
+  background: #26364a;
+  font: inherit;
+}
+.offline-media-controls button:disabled { opacity: .5; }
+.offline-media-controls :focus-visible { outline: 3px solid #7ebcff; outline-offset: 2px; }

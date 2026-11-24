@@ -1,0 +1,46 @@
+{
+  "formatVersion": 1,
+  "electronVersion": "22.3.26",
+  "chromiumVersion": "108.0.5359.215",
+  "nodeVersion": "16.17.1",
+  "platform": "linux",
+  "architecture": "ia32",
+  "depotTools": {
+    "url": "https://chromium.googlesource.com/chromium/tools/depot_tools.git",
+    "commit": "7a339079d178fbc9c6f6230082843d6e00b2551f"
+  },
+  "repositories": {
+    "chromium": {
+      "path": "src",
+      "url": "https://chromium.googlesource.com/chromium/src.git",
+      "upstreamCommit": "513ac8b2c47c7e1ac6b9f4fb5ea98e965cf29b66",
+      "electronPatchedTree": "f8633802ad91aafb3cffb29cb2ce9ae9b9f5fb8a",
+      "portPatch": "patches/chromium.patch",
+      "patchSha256": "667528bae656c351f5132c2f4d56f37b0694a7cbb09d0cf6d2f9bf4067063508"
+    },
+    "electron": {
+      "path": "src/electron",
+      "url": "https://github.com/electron/electron.git",
+      "upstreamCommit": "1c1c13234f606f80b5684d4846f4ab52df4a9d28",
+      "electronPatchedTree": "88de40a906becbd957a3359437b06d64ab771b90",
+      "portPatch": "patches/electron.patch",
+      "patchSha256": "994e945c6db9508ff784b29b621135bed49f46aa44467eb10743ca3c0edc4806"
+    },
+    "v8": {
+      "path": "src/v8",
+      "url": "https://chromium.googlesource.com/v8/v8.git",
+      "upstreamCommit": "18a6255a7b7c82e94089589396db33b2f66f83a0",
+      "electronPatchedTree": "59eac677dafc3e7078b4282883c4dbce68cd936c",
+      "portPatch": "patches/v8.patch",
+      "patchSha256": "0b1b1187147b7ec0a7c3bdac17b6f43934575d692fb106ed2bec4d9da88af207"
+    },
+    "node": {
+      "path": "src/third_party/electron_node",
+      "url": "https://github.com/nodejs/node.git",
+      "upstreamCommit": "6b06e89c7dfccec6792008302af1cee57649445c",
+      "electronPatchedTree": "5e4a7f9d00d7be524b93edcbc84477c3d9ff1285"
+    }
+  },
+  "sourceDateEpoch": 1616074138,
+  "bytecodePolicy": "Only the exact trusted user-supplied baseline; V8_ACCEPT_FOREIGN_FLAG_HASH is opt-in and bypasses a compatibility check, not source integrity or authenticity validation."
+}

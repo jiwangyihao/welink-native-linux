@@ -1,0 +1,18 @@
+{
+  "scope": "Original DLL against a private synthetic loopback fixture; no real credentials or files",
+  "init_result": 0,
+  "callback": {
+    "description": "tup_offlinefile_login",
+    "param": {
+      "plogin_result": 0,
+      "user_id": ""
+    },
+    "result": 1,
+    "rsp": 589828,
+    "sno": 1
+  },
+  "http_requests": [],
+  "probe_stderr": "INIT 0\nEND flow=11 progress=0 completion=0\n",
+  "probe_exit": -9,
+  "explanation": "Login failed before any recorded HTTP request; Shutdown did not return before the fixture timeout. No download or release was attempted."
+}

@@ -1,0 +1,1771 @@
+{
+  "target": "i686-linux-gnu",
+  "sources": {
+    "Packages.xz": "https://deb.debian.org/debian",
+    "Security-Packages.xz": "https://deb.debian.org/debian-security"
+  },
+  "roots": [
+    "libcurl4-openssl-dev",
+    "libssl-dev",
+    "libglib2.0-dev",
+    "libgcc-14-dev",
+    "libc6-dev",
+    "zlib1g-dev",
+    "libarchive-dev",
+    "libgif-dev",
+    "libgdk-pixbuf-2.0-dev",
+    "libxcb-screensaver0-dev",
+    "libxcb-composite0-dev",
+    "libxcb-shape0-dev"
+  ],
+  "packages": [
+    {
+      "Package": "comerr-dev",
+      "Version": "2.1-1.47.2-3+b12",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libcom-err2 (= 1.47.2-3+b12)",
+      "Filename": "pool/main/e/e2fsprogs/comerr-dev_2.1-1.47.2-3+b12_i386.deb",
+      "SHA256": "173b2ac860e46c6d0ea2e5e68bfd030ec1f310e165792a07c7834e03d637b2e2",
+      "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/comerr-dev_2.1-1.47.2-3+b12_i386.deb"
+    },
+    {
+      "Package": "debconf",
+      "Version": "1.5.91",
+      "Architecture": "all",
+      "Filename": "pool/main/d/debconf/debconf_1.5.91_all.deb",
+      "SHA256": "1ddc7e6c5925f748eefb7ca811d98e049f18c158bb21fbc7e122262ce6011e49",
+      "url": "https://deb.debian.org/debian/pool/main/d/debconf/debconf_1.5.91_all.deb"
+    },
+    {
+      "Package": "dpkg",
+      "Version": "1.22.22",
+      "Architecture": "i386",
+      "Depends": "tar (>= 1.28-1)",
+      "Pre-Depends": "libbz2-1.0, libc6 (>= 2.38), liblzma5 (>= 5.4.0), libmd0 (>= 0.0.0), libselinux1 (>= 3.1~), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/d/dpkg/dpkg_1.22.22_i386.deb",
+      "SHA256": "7f54c0898d09e814231664582dec7ef25fc958d468e73e423624775dc9077cc2",
+      "url": "https://deb.debian.org/debian/pool/main/d/dpkg/dpkg_1.22.22_i386.deb"
+    },
+    {
+      "Package": "gcc-14-base",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Filename": "pool/main/g/gcc-14/gcc-14-base_14.2.0-19_i386.deb",
+      "SHA256": "cab3cc6782d6cd3445d184ad317bbd8cc46395eb2675ccd75f4b57147469887a",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/gcc-14-base_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "gir1.2-gdkpixbuf-2.0",
+      "Version": "2.42.12+dfsg-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "gir1.2-gio-2.0, gir1.2-gmodule-2.0, libgdk-pixbuf-2.0-0 (>= 2.39.2)",
+      "Filename": "pool/main/g/gdk-pixbuf/gir1.2-gdkpixbuf-2.0_2.42.12+dfsg-4+deb13u1_i386.deb",
+      "SHA256": "f3c422636679d70a3a8a2f0428d0b832d548467b43276e021a52d4c9cbf27040",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gdk-pixbuf/gir1.2-gdkpixbuf-2.0_2.42.12+dfsg-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "gir1.2-glib-2.0",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "libglib2.0-0t64 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/gir1.2-glib-2.0_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "3b113c2fab9cbd3abe30afd17d22f9003f11647e61ec2df026101a3f90071f54",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/gir1.2-glib-2.0_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "gir1.2-glib-2.0-dev",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "gir1.2-glib-2.0 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/gir1.2-glib-2.0-dev_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "ae73dfb4fdfea2023c8488b2125256e96dd9c0e77036c662e0956306b45d82c5",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/gir1.2-glib-2.0-dev_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "girepository-tools",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "native-architecture | cross-exe-wrapper, libc6 (>= 2.38), libffi8 (>= 3.4), libgirepository-2.0-0 (= 2.84.4-3~deb13u5), libglib2.0-0t64 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/girepository-tools_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "f9752beb8ffb6819ea24d29ba0d7d8ee0dfa1ae0429470cd3649be808fe0e265",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/girepository-tools_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "krb5-multidev",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "comerr-dev, libgssapi-krb5-2 (= 1.21.3-5+deb13u1), libgssrpc4t64 (= 1.21.3-5+deb13u1), libk5crypto3 (= 1.21.3-5+deb13u1), libkadm5clnt-mit12 (= 1.21.3-5+deb13u1), libkadm5srv-mit12 (= 1.21.3-5+deb13u1), libkrb5-3 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/krb5-multidev_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "5979e4d89ed2b8e46817ffe0601e2434be6dbf34c2147c967b920917d02e31a3",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/krb5-multidev_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libacl1",
+      "Version": "2.3.2-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/a/acl/libacl1_2.3.2-2+b1_i386.deb",
+      "SHA256": "978d20b5c4e5de55d15d2116be07279ac5e4f06745a7c0d33f1c9fd4ff945dd3",
+      "url": "https://deb.debian.org/debian/pool/main/a/acl/libacl1_2.3.2-2+b1_i386.deb"
+    },
+    {
+      "Package": "libacl1-dev",
+      "Version": "2.3.2-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libacl1 (= 2.3.2-2+b1), libattr1-dev (>= 1:2.4.46-8)",
+      "Filename": "pool/main/a/acl/libacl1-dev_2.3.2-2+b1_i386.deb",
+      "SHA256": "f13b7f2ac99d320e0090e67d8784291d2896e97678a971e8933a5b58896992b2",
+      "url": "https://deb.debian.org/debian/pool/main/a/acl/libacl1-dev_2.3.2-2+b1_i386.deb"
+    },
+    {
+      "Package": "libarchive-dev",
+      "Version": "3.7.4-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libacl1-dev, libarchive13t64 (= 3.7.4-4+deb13u1), libbz2-dev, libext2fs-dev, liblz4-dev, liblzma-dev, libxml2-dev, libzstd-dev, nettle-dev, zlib1g-dev",
+      "Filename": "pool/main/liba/libarchive/libarchive-dev_3.7.4-4+deb13u1_i386.deb",
+      "SHA256": "836f1988709e59a1a086bf90e86f32f1a7c789d55a432e043662db32d9bb95d0",
+      "url": "https://deb.debian.org/debian/pool/main/liba/libarchive/libarchive-dev_3.7.4-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libarchive13t64",
+      "Version": "3.7.4-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libacl1 (>= 2.2.23), libbz2-1.0, libc6 (>= 2.38), liblz4-1 (>= 0.0~r130), liblzma5 (>= 5.2.2), libnettle8t64, libxml2 (>= 2.7.4), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/liba/libarchive/libarchive13t64_3.7.4-4+deb13u1_i386.deb",
+      "SHA256": "5101e88c86f011a29af73f584d133e2896b51dbd643ce74593cbfef9728033d7",
+      "url": "https://deb.debian.org/debian/pool/main/liba/libarchive/libarchive13t64_3.7.4-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libasan8",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.34), libgcc-s1 (>= 3.3)",
+      "Filename": "pool/main/g/gcc-14/libasan8_14.2.0-19_i386.deb",
+      "SHA256": "83e0e618118e159db4a1a4a22db9ea8f1b4a358701c470d56ff43f6fc34b746c",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libasan8_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libatomic1",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.1.3)",
+      "Filename": "pool/main/g/gcc-14/libatomic1_14.2.0-19_i386.deb",
+      "SHA256": "99b97383f7b8c768e04b5bed83b3854c5a4d9eaed2558632508fde8ef2ec7906",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libatomic1_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libattr1",
+      "Version": "1:2.5.2-3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/a/attr/libattr1_2.5.2-3_i386.deb",
+      "SHA256": "9e04b4b90e681e93bf05807a17769a00b22a7a1fbb079ebc095eb05d3e4ccb54",
+      "url": "https://deb.debian.org/debian/pool/main/a/attr/libattr1_2.5.2-3_i386.deb"
+    },
+    {
+      "Package": "libattr1-dev",
+      "Version": "1:2.5.2-3",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libattr1 (= 1:2.5.2-3)",
+      "Filename": "pool/main/a/attr/libattr1-dev_2.5.2-3_i386.deb",
+      "SHA256": "8000cfb4990836b317d9a256652d79db7782e0a95e27db2fc983bec7797a3a1a",
+      "url": "https://deb.debian.org/debian/pool/main/a/attr/libattr1-dev_2.5.2-3_i386.deb"
+    },
+    {
+      "Package": "libblkid-dev",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libblkid1 (= 2.41.5-0+deb13u1), libc6-dev | libc-dev, uuid-dev",
+      "Filename": "pool/main/u/util-linux/libblkid-dev_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "fd859b3660430410c890721bbb5e320b11cbe660c3f61f15f1b6c3980b052841",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/libblkid-dev_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libblkid1",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/u/util-linux/libblkid1_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "541f172e77a6e8148ae0171f7dabd11545cf3dc4a3b53e4d1782c9538a388f9a",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/libblkid1_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libbrotli-dev",
+      "Version": "1.1.0-2+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libbrotli1 (= 1.1.0-2+deb13u1)",
+      "Filename": "pool/updates/main/b/brotli/libbrotli-dev_1.1.0-2+deb13u1_i386.deb",
+      "SHA256": "18a0d84ed6d0a79b53494cb7f597e60c6fd09b4e3342eccdf70c177d59b86424",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/b/brotli/libbrotli-dev_1.1.0-2+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libbrotli1",
+      "Version": "1.1.0-2+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.29)",
+      "Filename": "pool/updates/main/b/brotli/libbrotli1_1.1.0-2+deb13u1_i386.deb",
+      "SHA256": "b686eb23b57276622a8517f75e31a479eae82d736cae449e873695ff38508611",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/b/brotli/libbrotli1_1.1.0-2+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libbz2-1.0",
+      "Version": "1.0.8-6",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/b/bzip2/libbz2-1.0_1.0.8-6_i386.deb",
+      "SHA256": "c23dee450dcee574135cbe004d463be3f413cdc017b22d8273c5ce0a18a7de10",
+      "url": "https://deb.debian.org/debian/pool/main/b/bzip2/libbz2-1.0_1.0.8-6_i386.deb"
+    },
+    {
+      "Package": "libbz2-dev",
+      "Version": "1.0.8-6",
+      "Architecture": "i386",
+      "Depends": "libbz2-1.0 (= 1.0.8-6), libc6-dev | libc-dev",
+      "Filename": "pool/main/b/bzip2/libbz2-dev_1.0.8-6_i386.deb",
+      "SHA256": "d136e7e613efa498254cb1d2505689dee44cf805343af0de241b6292e08c1340",
+      "url": "https://deb.debian.org/debian/pool/main/b/bzip2/libbz2-dev_1.0.8-6_i386.deb"
+    },
+    {
+      "Package": "libc-dev-bin",
+      "Version": "2.41-12+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>> 2.41), libc6 (<< 2.42)",
+      "Filename": "pool/main/g/glibc/libc-dev-bin_2.41-12+deb13u4_i386.deb",
+      "SHA256": "71fdf88ebc96e306c23ac7e248f43135ec213df20c93641fcaeb65bb527a7e17",
+      "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc-dev-bin_2.41-12+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libc6",
+      "Version": "2.41-12+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libgcc-s1",
+      "Filename": "pool/main/g/glibc/libc6_2.41-12+deb13u4_i386.deb",
+      "SHA256": "67bb4b54cf4bb6a380449dfa1852cd9135659f85360caa0e41d312f4b30e573a",
+      "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.41-12+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libc6-dev",
+      "Version": "2.41-12+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libc6 (= 2.41-12+deb13u4), libc-dev-bin (= 2.41-12+deb13u4), linux-libc-dev, libcrypt-dev, rpcsvc-proto",
+      "Filename": "pool/main/g/glibc/libc6-dev_2.41-12+deb13u4_i386.deb",
+      "SHA256": "53dae947b759288f7f1e858a7eec6c3c00adf50317c674515c2a9d2399681bb0",
+      "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6-dev_2.41-12+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libcom-err2",
+      "Version": "1.47.2-3+b12",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/e/e2fsprogs/libcom-err2_1.47.2-3+b12_i386.deb",
+      "SHA256": "0a1ed6fc09b01df4a567b66aa9c84b190f9da2e1c0d1df70b3cd8b4865743fc5",
+      "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/libcom-err2_1.47.2-3+b12_i386.deb"
+    },
+    {
+      "Package": "libcrypt-dev",
+      "Version": "1:4.4.38-1",
+      "Architecture": "i386",
+      "Depends": "libcrypt1 (= 1:4.4.38-1)",
+      "Filename": "pool/main/libx/libxcrypt/libcrypt-dev_4.4.38-1_i386.deb",
+      "SHA256": "4f652212cb1a9841a75c8fb1b1cf392695d5766ed3444ad9e2e5b834fd02c8b8",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libcrypt-dev_4.4.38-1_i386.deb"
+    },
+    {
+      "Package": "libcrypt1",
+      "Version": "1:4.4.38-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/libx/libxcrypt/libcrypt1_4.4.38-1_i386.deb",
+      "SHA256": "fa1fdc4e9ecbede4f9e958824d33f2d27b68c6408464422b6fbb694425342b9c",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libcrypt1_4.4.38-1_i386.deb"
+    },
+    {
+      "Package": "libcurl4-openssl-dev",
+      "Version": "8.14.1-2+deb13u7",
+      "Architecture": "i386",
+      "Depends": "libbrotli-dev, libcurl4t64 (= 8.14.1-2+deb13u7), libidn2-dev, libkrb5-dev, libldap-dev, libnghttp2-dev, libnghttp3-dev (>= 1.1.0), libpsl-dev, librtmp-dev, libssh2-1-dev, libssl-dev, libzstd-dev, zlib1g-dev",
+      "Filename": "pool/updates/main/c/curl/libcurl4-openssl-dev_8.14.1-2+deb13u7_i386.deb",
+      "SHA256": "1c7827dfb6c9be93a5f4c87b720b0f81a858817f68a421a4926ae012e5d4cd73",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/c/curl/libcurl4-openssl-dev_8.14.1-2+deb13u7_i386.deb"
+    },
+    {
+      "Package": "libcurl4t64",
+      "Version": "8.14.1-2+deb13u7",
+      "Architecture": "i386",
+      "Depends": "libbrotli1 (>= 0.6.0), libc6 (>= 2.38), libgssapi-krb5-2 (>= 1.17), libidn2-0 (>= 2.0.0), libldap2 (>= 2.6.2), libnghttp2-14 (>= 1.50.0), libnghttp3-9 (>= 0.15.0), libpsl5t64 (>= 0.16.0), librtmp1 (>= 2.3), libssh2-1t64 (>= 1.11.1), libssl3t64 (>= 3.3.0), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.2.3.4)",
+      "Filename": "pool/updates/main/c/curl/libcurl4t64_8.14.1-2+deb13u7_i386.deb",
+      "SHA256": "79220cd6cc379b410e9d3c9d50de9e620451451825de674845ce447a88c7c277",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/c/curl/libcurl4t64_8.14.1-2+deb13u7_i386.deb"
+    },
+    {
+      "Package": "libdb5.3t64",
+      "Version": "5.3.28+dfsg2-9",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/d/db5.3/libdb5.3t64_5.3.28+dfsg2-9_i386.deb",
+      "SHA256": "1a07cc33aac4026ac9f0967825b86d723ad08cf916b96fa3bdaa2655a42b43ed",
+      "url": "https://deb.debian.org/debian/pool/main/d/db5.3/libdb5.3t64_5.3.28+dfsg2-9_i386.deb"
+    },
+    {
+      "Package": "libdeflate-dev",
+      "Version": "1.23-2",
+      "Architecture": "i386",
+      "Depends": "libdeflate0 (= 1.23-2)",
+      "Filename": "pool/main/libd/libdeflate/libdeflate-dev_1.23-2_i386.deb",
+      "SHA256": "a9e826a13455b249e5a9e4fe580ea375be1667e4b3461dc21a7f2ac42d418715",
+      "url": "https://deb.debian.org/debian/pool/main/libd/libdeflate/libdeflate-dev_1.23-2_i386.deb"
+    },
+    {
+      "Package": "libdeflate0",
+      "Version": "1.23-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/libd/libdeflate/libdeflate0_1.23-2_i386.deb",
+      "SHA256": "a18d6295324d98e7e209d08c18f0a4aa58203bd251996c9b638cf72d474280d1",
+      "url": "https://deb.debian.org/debian/pool/main/libd/libdeflate/libdeflate0_1.23-2_i386.deb"
+    },
+    {
+      "Package": "libelf1t64",
+      "Version": "0.192-4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/e/elfutils/libelf1t64_0.192-4_i386.deb",
+      "SHA256": "857d2cfe946eea39d9c670522d61675a0fc546f65e7fb33ae5088626c7293468",
+      "url": "https://deb.debian.org/debian/pool/main/e/elfutils/libelf1t64_0.192-4_i386.deb"
+    },
+    {
+      "Package": "libevent-2.1-7t64",
+      "Version": "2.1.13-stable-1~deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/updates/main/libe/libevent/libevent-2.1-7t64_2.1.13-stable-1~deb13u1_i386.deb",
+      "SHA256": "679ba20b3aab6e02b444a74e78628914bd8b805f8eb92b2037011c3eeb70b6d0",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/libe/libevent/libevent-2.1-7t64_2.1.13-stable-1~deb13u1_i386.deb"
+    },
+    {
+      "Package": "libexpat1",
+      "Version": "2.9.0-1~deb13u1",
+      "Architecture": "i386",
+      "Pre-Depends": "libc6 (>= 2.36)",
+      "Filename": "pool/updates/main/e/expat/libexpat1_2.9.0-1~deb13u1_i386.deb",
+      "SHA256": "dacea4f5745522893556052bf5f387fbab019e1547b8dd4a120fa593d9d1f15d",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/e/expat/libexpat1_2.9.0-1~deb13u1_i386.deb"
+    },
+    {
+      "Package": "libext2fs-dev",
+      "Version": "1.47.2-3+b12",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, comerr-dev, libext2fs2t64 (= 1.47.2-3+b12)",
+      "Filename": "pool/main/e/e2fsprogs/libext2fs-dev_1.47.2-3+b12_i386.deb",
+      "SHA256": "076b2b09ebd0d4a9edd8c47ed1982d29078bedfe0aefe65ebdef6fb2ef899c74",
+      "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/libext2fs-dev_1.47.2-3+b12_i386.deb"
+    },
+    {
+      "Package": "libext2fs2t64",
+      "Version": "1.47.2-3+b12",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/e/e2fsprogs/libext2fs2t64_1.47.2-3+b12_i386.deb",
+      "SHA256": "39782c55de23738bf9e76af30eb5ff707a55c13982c3ed3e2b731218533bfd48",
+      "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/libext2fs2t64_1.47.2-3+b12_i386.deb"
+    },
+    {
+      "Package": "libffi-dev",
+      "Version": "3.4.8-2",
+      "Architecture": "i386",
+      "Depends": "libffi8 (= 3.4.8-2)",
+      "Filename": "pool/main/libf/libffi/libffi-dev_3.4.8-2_i386.deb",
+      "SHA256": "08a6f4d5e0c61113c227d4e0a4fe7e90a6d7025903979f50fad24d3224401cc3",
+      "url": "https://deb.debian.org/debian/pool/main/libf/libffi/libffi-dev_3.4.8-2_i386.deb"
+    },
+    {
+      "Package": "libffi8",
+      "Version": "3.4.8-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/libf/libffi/libffi8_3.4.8-2_i386.deb",
+      "SHA256": "8bafefb38c320ca27796070c881595ce04d900c3b534ac142a494daf1fe1db13",
+      "url": "https://deb.debian.org/debian/pool/main/libf/libffi/libffi8_3.4.8-2_i386.deb"
+    },
+    {
+      "Package": "libgcc-14-dev",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libgcc-s1 (>= 14.2.0-19), libgomp1 (>= 14.2.0-19), libitm1 (>= 14.2.0-19), libatomic1 (>= 14.2.0-19), libasan8 (>= 14.2.0-19), libubsan1 (>= 14.2.0-19), libquadmath0 (>= 14.2.0-19)",
+      "Filename": "pool/main/g/gcc-14/libgcc-14-dev_14.2.0-19_i386.deb",
+      "SHA256": "d7e960c3c23fc017cb958ad7497bf1d2dce8a70fd6341614580c249cb5859265",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libgcc-14-dev_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libgcc-s1",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.35)",
+      "Filename": "pool/main/g/gcc-14/libgcc-s1_14.2.0-19_i386.deb",
+      "SHA256": "a4c71fd856d2a48a7505a087b4186e3cca23f94603c05e3fb7c799b27e72f761",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libgcc-s1_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libgdk-pixbuf-2.0-0",
+      "Version": "2.42.12+dfsg-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libgdk-pixbuf2.0-common (>= 2.42.12+dfsg-4+deb13u1), shared-mime-info, libc6 (>= 2.34), libglib2.0-0t64 (>= 2.80.0), libjpeg62-turbo (>= 1.3.1), libpng16-16t64 (>= 1.6.46), libtiff6 (>= 4.0.3)",
+      "Filename": "pool/main/g/gdk-pixbuf/libgdk-pixbuf-2.0-0_2.42.12+dfsg-4+deb13u1_i386.deb",
+      "SHA256": "b2ee8312db2698fd0f3059f4fc85ce28b3a8150a66d4570c4da7117726bdf979",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gdk-pixbuf/libgdk-pixbuf-2.0-0_2.42.12+dfsg-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgdk-pixbuf-2.0-dev",
+      "Version": "2.42.12+dfsg-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "gir1.2-gdkpixbuf-2.0 (= 2.42.12+dfsg-4+deb13u1), libgdk-pixbuf-2.0-0 (= 2.42.12+dfsg-4+deb13u1), libgdk-pixbuf2.0-bin (= 2.42.12+dfsg-4+deb13u1), libglib2.0-dev, libjpeg-dev, libpng-dev (<< 1.7), libtiff-dev, shared-mime-info, gir1.2-gio-2.0-dev, gir1.2-gmodule-2.0-dev",
+      "Filename": "pool/main/g/gdk-pixbuf/libgdk-pixbuf-2.0-dev_2.42.12+dfsg-4+deb13u1_i386.deb",
+      "SHA256": "6b6762311a66e9ed0c2db676d169481aca8e001a12eb3e47b9da1a879b40c8ea",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gdk-pixbuf/libgdk-pixbuf-2.0-dev_2.42.12+dfsg-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgdk-pixbuf2.0-bin",
+      "Version": "2.42.12+dfsg-4+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), libgdk-pixbuf-2.0-0 (>= 2.35.4), libglib2.0-0t64 (>= 2.16.0)",
+      "Filename": "pool/main/g/gdk-pixbuf/libgdk-pixbuf2.0-bin_2.42.12+dfsg-4+deb13u1_i386.deb",
+      "SHA256": "eaa3430aa2dcbddd96cd39b78b81269b1bfbd5244d0412cc192fbbf0ae7c63ab",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gdk-pixbuf/libgdk-pixbuf2.0-bin_2.42.12+dfsg-4+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgdk-pixbuf2.0-common",
+      "Version": "2.42.12+dfsg-4+deb13u1",
+      "Architecture": "all",
+      "Filename": "pool/main/g/gdk-pixbuf/libgdk-pixbuf2.0-common_2.42.12+dfsg-4+deb13u1_all.deb",
+      "SHA256": "9f0c64e33cf5bb3226a5a6ddf630dd76530596e476e6b47a8b27da444ff43a03",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gdk-pixbuf/libgdk-pixbuf2.0-common_2.42.12+dfsg-4+deb13u1_all.deb"
+    },
+    {
+      "Package": "libgif-dev",
+      "Version": "5.2.2-1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libgif7 (= 5.2.2-1+deb13u1)",
+      "Filename": "pool/main/g/giflib/libgif-dev_5.2.2-1+deb13u1_i386.deb",
+      "SHA256": "f3b54a8949ec49cb64647592c56653a5c3dd5fcafe8409994d8ae00b64e61052",
+      "url": "https://deb.debian.org/debian/pool/main/g/giflib/libgif-dev_5.2.2-1+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgif7",
+      "Version": "5.2.2-1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/g/giflib/libgif7_5.2.2-1+deb13u1_i386.deb",
+      "SHA256": "181997594d6e584d057f0438f50ea7ac527aba907643126147ed2481869cc59f",
+      "url": "https://deb.debian.org/debian/pool/main/g/giflib/libgif7_5.2.2-1+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgio-2.0-dev",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "libffi-dev, libglib2.0-0t64 (= 2.84.4-3~deb13u5), libmount-dev, libpcre2-dev, libselinux1-dev, libsysprof-capture-4-dev (>= 3.38.0), pkgconf, zlib1g-dev",
+      "Filename": "pool/main/g/glib2.0/libgio-2.0-dev_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "1245fcb4c7b1e868d3d2fd3f819c4763486d5438a4e078c722d5b1fc3a45986e",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libgio-2.0-dev_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libgio-2.0-dev-bin",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "python3-packaging, python3:any, libc6 (>= 2.38), libglib2.0-0t64 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/libgio-2.0-dev-bin_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "5699e02c332a2074cdd73ee65c1ba01ca7538085ca0594fda77a1414b5395f59",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libgio-2.0-dev-bin_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libgirepository-2.0-0",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libffi8 (>= 3.4), libglib2.0-0t64 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/libgirepository-2.0-0_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "0769a106211da137e586e2f55017389486ae25e2c68335629761bd358251d0bf",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libgirepository-2.0-0_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libglib2.0-0t64",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "libatomic1 (>= 4.8), libc6 (>= 2.38), libffi8 (>= 3.4), libmount1 (>= 2.40~rc2), libpcre2-8-0 (>= 10.22), libselinux1 (>= 3.1~), zlib1g (>= 1:1.2.2)",
+      "Filename": "pool/main/g/glib2.0/libglib2.0-0t64_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "e773e9c94f3c833ffa75fe8531cb16c8e9f4717cc76201badffeb45c1b4bf56c",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libglib2.0-0t64_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libglib2.0-bin",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "libglib2.0-data, libc6 (>= 2.38), libelf1t64 (>= 0.142), libglib2.0-0t64 (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/libglib2.0-bin_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "f5f7f49fa802cb7b9ac8706d2548f04400f30a614586849baa9c1af9a23173a6",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libglib2.0-bin_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libglib2.0-data",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "all",
+      "Filename": "pool/main/g/glib2.0/libglib2.0-data_2.84.4-3~deb13u5_all.deb",
+      "SHA256": "11c671d0a21dd99215bc62fc0219a1fcbb1482f36329ab6b85732e09ddff9e1c",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libglib2.0-data_2.84.4-3~deb13u5_all.deb"
+    },
+    {
+      "Package": "libglib2.0-dev",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "girepository-tools (= 2.84.4-3~deb13u5), libgio-2.0-dev (= 2.84.4-3~deb13u5), libglib2.0-bin (= 2.84.4-3~deb13u5), libglib2.0-dev-bin (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/libglib2.0-dev_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "dea18e857ee204a44b098861f83f3e16a78e47d1f527da77ff4b1d429fd1b024",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libglib2.0-dev_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libglib2.0-dev-bin",
+      "Version": "2.84.4-3~deb13u5",
+      "Architecture": "i386",
+      "Depends": "girepository-tools (= 2.84.4-3~deb13u5), libgio-2.0-dev-bin (= 2.84.4-3~deb13u5)",
+      "Filename": "pool/main/g/glib2.0/libglib2.0-dev-bin_2.84.4-3~deb13u5_i386.deb",
+      "SHA256": "8a5b41be8b6d1e044ec3d32e4e28196366f4e9645c2eb309af417e5a4cb656a3",
+      "url": "https://deb.debian.org/debian/pool/main/g/glib2.0/libglib2.0-dev-bin_2.84.4-3~deb13u5_i386.deb"
+    },
+    {
+      "Package": "libgmp-dev",
+      "Version": "2:6.3.0+dfsg-3",
+      "Architecture": "i386",
+      "Depends": "libgmp10 (= 2:6.3.0+dfsg-3), libgmpxx4ldbl (= 2:6.3.0+dfsg-3)",
+      "Filename": "pool/main/g/gmp/libgmp-dev_6.3.0+dfsg-3_i386.deb",
+      "SHA256": "6b6af0b05e2d8a98ed1dd28043ae7f1e832680d44d1e59e21b2b368108bf06c1",
+      "url": "https://deb.debian.org/debian/pool/main/g/gmp/libgmp-dev_6.3.0+dfsg-3_i386.deb"
+    },
+    {
+      "Package": "libgmp10",
+      "Version": "2:6.3.0+dfsg-3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/g/gmp/libgmp10_6.3.0+dfsg-3_i386.deb",
+      "SHA256": "f005fef33ce70d6775070c60017f0d29a0c415f1b657b4cc622d1a556561615c",
+      "url": "https://deb.debian.org/debian/pool/main/g/gmp/libgmp10_6.3.0+dfsg-3_i386.deb"
+    },
+    {
+      "Package": "libgmpxx4ldbl",
+      "Version": "2:6.3.0+dfsg-3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libgcc-s1 (>= 3.0), libgmp10 (>= 2:6.3.0+dfsg), libstdc++6 (>= 13.1)",
+      "Filename": "pool/main/g/gmp/libgmpxx4ldbl_6.3.0+dfsg-3_i386.deb",
+      "SHA256": "44e768c65a642bb04cc94954cb008641721fd960e0217a951806dd935a5342a6",
+      "url": "https://deb.debian.org/debian/pool/main/g/gmp/libgmpxx4ldbl_6.3.0+dfsg-3_i386.deb"
+    },
+    {
+      "Package": "libgnutls-dane0t64",
+      "Version": "3.8.9-3+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libgnutls30t64 (= 3.8.9-3+deb13u4), libc6 (>= 2.34), libunbound8 (>= 1.8.0)",
+      "Filename": "pool/main/g/gnutls28/libgnutls-dane0t64_3.8.9-3+deb13u4_i386.deb",
+      "SHA256": "252961ec23fff3762b49b996a089bf8f5040e043b81eb7adcf4dd2a3e3ada201",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gnutls28/libgnutls-dane0t64_3.8.9-3+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libgnutls-openssl27t64",
+      "Version": "3.8.9-3+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libgnutls30t64 (= 3.8.9-3+deb13u4), libc6 (>= 2.34)",
+      "Filename": "pool/main/g/gnutls28/libgnutls-openssl27t64_3.8.9-3+deb13u4_i386.deb",
+      "SHA256": "ae92eb09c236e222bf31af8b38d0a08fca319ae379762ccad57617cf09bfcff8",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gnutls28/libgnutls-openssl27t64_3.8.9-3+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libgnutls28-dev",
+      "Version": "3.8.9-3+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libgnutls-dane0t64 (= 3.8.9-3+deb13u4), libgnutls-openssl27t64 (= 3.8.9-3+deb13u4), libgnutls30t64 (= 3.8.9-3+deb13u4), libidn2-dev, libp11-kit-dev, libtasn1-6-dev, nettle-dev (>= 3.6)",
+      "Filename": "pool/main/g/gnutls28/libgnutls28-dev_3.8.9-3+deb13u4_i386.deb",
+      "SHA256": "53889687861f6425f37817092157ee8ffe1d97c2e7f81cdb3dcad99c9abd22d5",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gnutls28/libgnutls28-dev_3.8.9-3+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libgnutls30t64",
+      "Version": "3.8.9-3+deb13u4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libgmp10 (>= 2:6.3.0+dfsg), libhogweed6t64 (>= 3.10), libidn2-0 (>= 2.0.0), libnettle8t64 (>= 3.10), libp11-kit0 (>= 0.25.1), libtasn1-6 (>= 4.14), libunistring5 (>= 1.1)",
+      "Filename": "pool/main/g/gnutls28/libgnutls30t64_3.8.9-3+deb13u4_i386.deb",
+      "SHA256": "8cf569d66f972184d90bdb424eb5b0af1245df4abb15f229d30b6c905d565265",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/g/gnutls28/libgnutls30t64_3.8.9-3+deb13u4_i386.deb"
+    },
+    {
+      "Package": "libgomp1",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.38)",
+      "Filename": "pool/main/g/gcc-14/libgomp1_14.2.0-19_i386.deb",
+      "SHA256": "431057e93fc3025567b30006cf4d509597995557454d31eec759035c43ea129b",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libgomp1_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libgssapi-krb5-2",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libkrb5-3 (= 1.21.3-5+deb13u1), libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libk5crypto3 (>= 1.20), libkrb5support0 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libgssapi-krb5-2_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "d211e7815c8c7343936ad32920fab5eb476b606d868451f978fc995e305751db",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libgssapi-krb5-2_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libgssrpc4t64",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), libgssapi-krb5-2 (>= 1.17)",
+      "Filename": "pool/main/k/krb5/libgssrpc4t64_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "d0b2b34843628c2a1362125129bcf420222f996418018916f8551284dd4c5a19",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libgssrpc4t64_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libhogweed6t64",
+      "Version": "3.10.1-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libgmp10 (>= 2:6.3.0+dfsg), libnettle8t64",
+      "Filename": "pool/main/n/nettle/libhogweed6t64_3.10.1-1_i386.deb",
+      "SHA256": "c947e90d9451239ebfa85f67ae0a6c3f9dc19b8bd9f0bb7c98a73dff33665592",
+      "url": "https://deb.debian.org/debian/pool/main/n/nettle/libhogweed6t64_3.10.1-1_i386.deb"
+    },
+    {
+      "Package": "libidn2-0",
+      "Version": "2.3.8-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.28), libunistring5 (>= 1.1)",
+      "Filename": "pool/main/libi/libidn2/libidn2-0_2.3.8-2_i386.deb",
+      "SHA256": "385d7ec787a45c8afbca118f30c770186004542011699ae0b51b37ed5f9a5b22",
+      "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2-0_2.3.8-2_i386.deb"
+    },
+    {
+      "Package": "libidn2-dev",
+      "Version": "2.3.8-2",
+      "Architecture": "i386",
+      "Depends": "libidn2-0 (= 2.3.8-2)",
+      "Filename": "pool/main/libi/libidn2/libidn2-dev_2.3.8-2_i386.deb",
+      "SHA256": "d8c2610e5dad1631a087124ba0cc3fe8f839b282658e36ed1202b4d35a63e006",
+      "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2-dev_2.3.8-2_i386.deb"
+    },
+    {
+      "Package": "libitm1",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.34)",
+      "Filename": "pool/main/g/gcc-14/libitm1_14.2.0-19_i386.deb",
+      "SHA256": "7f499b5aaab236f8ab293225ce5f0807e06de1422f3dc93b57ba657bc3f1a0c1",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libitm1_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libjbig-dev",
+      "Version": "2.1-6.1+b2",
+      "Architecture": "i386",
+      "Depends": "libjbig0 (= 2.1-6.1+b2)",
+      "Filename": "pool/main/j/jbigkit/libjbig-dev_2.1-6.1+b2_i386.deb",
+      "SHA256": "0f606f7c47270a4043cfd86d90b7bdacd87cf22384525fd1027bb56234bb0d4a",
+      "url": "https://deb.debian.org/debian/pool/main/j/jbigkit/libjbig-dev_2.1-6.1+b2_i386.deb"
+    },
+    {
+      "Package": "libjbig0",
+      "Version": "2.1-6.1+b2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/j/jbigkit/libjbig0_2.1-6.1+b2_i386.deb",
+      "SHA256": "517f806fe0031ee95f444648e5ba19b209715e33c490cd399dfccbdbebb5c2e0",
+      "url": "https://deb.debian.org/debian/pool/main/j/jbigkit/libjbig0_2.1-6.1+b2_i386.deb"
+    },
+    {
+      "Package": "libjpeg-dev",
+      "Version": "1:2.1.5-4",
+      "Architecture": "i386",
+      "Depends": "libjpeg62-turbo-dev (>= 1:2.1.5-4)",
+      "Filename": "pool/main/libj/libjpeg-turbo/libjpeg-dev_2.1.5-4_i386.deb",
+      "SHA256": "877db95afc8fa5175569f034e86cc3d239bf35635453c8bfa7a4bafb46b9876b",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg-dev_2.1.5-4_i386.deb"
+    },
+    {
+      "Package": "libjpeg62-turbo",
+      "Version": "1:2.1.5-4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.7)",
+      "Filename": "pool/main/libj/libjpeg-turbo/libjpeg62-turbo_2.1.5-4_i386.deb",
+      "SHA256": "d897f8cd7c76b85144d5b2f9f8798dbced8764539d5c0700f36a43611f09cca9",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo_2.1.5-4_i386.deb"
+    },
+    {
+      "Package": "libjpeg62-turbo-dev",
+      "Version": "1:2.1.5-4",
+      "Architecture": "i386",
+      "Depends": "libc-dev, libjpeg62-turbo (= 1:2.1.5-4)",
+      "Filename": "pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+      "SHA256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb"
+    },
+    {
+      "Package": "libk5crypto3",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libkrb5support0 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libk5crypto3_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "2b7baf4667e5e090eadf8bb039973ab553989b464d1dba04c0c2b2c78d988c1c",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libk5crypto3_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkadm5clnt-mit12",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libgssapi-krb5-2 (>= 1.17), libgssrpc4t64 (>= 1.6.dfsg.2), libk5crypto3 (>= 1.6.dfsg.2), libkrb5-3 (>= 1.15~beta1), libkrb5support0 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libkadm5clnt-mit12_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "7f3608f445d9ba635ff632d1bd819c0beb3142fafb1dc09a4b9ce267cef606c4",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkadm5clnt-mit12_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkadm5srv-mit12",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libgssapi-krb5-2 (>= 1.6.dfsg.2), libgssrpc4t64 (>= 1.6.dfsg.2), libk5crypto3 (>= 1.6.dfsg.2), libkdb5-10t64 (>= 1.21.3), libkrb5-3 (>= 1.15~beta1), libkrb5support0 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libkadm5srv-mit12_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "ce56821411042ea938113c86505cc8271c89f93967cf0a97e7cee64dceabe000",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkadm5srv-mit12_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkdb5-10t64",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libgssrpc4t64 (>= 1.7dfsg~alpha1), libk5crypto3 (>= 1.20), libkrb5-3 (>= 1.14+dfsg), libkrb5support0 (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libkdb5-10t64_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "94e10e925edb0236eee7db50f204720dfee0def69f5317e279cc0f25dd7389fc",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkdb5-10t64_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkeyutils1",
+      "Version": "1.6.3-6",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.7)",
+      "Filename": "pool/main/k/keyutils/libkeyutils1_1.6.3-6_i386.deb",
+      "SHA256": "ee25840a728d2cca5c3d7efe0db9f4c26ef1df88fc2265705164fb4db0576f0c",
+      "url": "https://deb.debian.org/debian/pool/main/k/keyutils/libkeyutils1_1.6.3-6_i386.deb"
+    },
+    {
+      "Package": "libkrb5-3",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libkrb5support0 (= 1.21.3-5+deb13u1), libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libk5crypto3 (>= 1.20), libkeyutils1 (>= 1.5.9), libssl3t64 (>= 3.0.0)",
+      "Filename": "pool/main/k/krb5/libkrb5-3_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "baae87f24ca36525bd20ae079d5de349ab2df1cce066e4c952cfd50934f6e179",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkrb5-3_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkrb5-dev",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "krb5-multidev (= 1.21.3-5+deb13u1)",
+      "Filename": "pool/main/k/krb5/libkrb5-dev_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "24c8e91a0c25145faec87685cf16328c8d5afc0d4a370506c120da428abd4a83",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkrb5-dev_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libkrb5support0",
+      "Version": "1.21.3-5+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/k/krb5/libkrb5support0_1.21.3-5+deb13u1_i386.deb",
+      "SHA256": "d48c9a178c6d123f30cb8721913553a755ceb8d0b30e280115aa14c35e300772",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkrb5support0_1.21.3-5+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libldap-dev",
+      "Version": "2.6.10+dfsg-1",
+      "Architecture": "i386",
+      "Depends": "libldap2 (= 2.6.10+dfsg-1)",
+      "Filename": "pool/main/o/openldap/libldap-dev_2.6.10+dfsg-1_i386.deb",
+      "SHA256": "c0db9ad790fed328cfa1399db7b53ed4a232aa92e63c224ced00626af6cddcfb",
+      "url": "https://deb.debian.org/debian/pool/main/o/openldap/libldap-dev_2.6.10+dfsg-1_i386.deb"
+    },
+    {
+      "Package": "libldap2",
+      "Version": "2.6.10+dfsg-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libsasl2-2 (>= 2.1.28+dfsg1), libssl3t64 (>= 3.0.0)",
+      "Filename": "pool/main/o/openldap/libldap2_2.6.10+dfsg-1_i386.deb",
+      "SHA256": "91cf1e99f340634bd3e858efa60608c458cb90047be8a8e1d33da5392f0ee7e0",
+      "url": "https://deb.debian.org/debian/pool/main/o/openldap/libldap2_2.6.10+dfsg-1_i386.deb"
+    },
+    {
+      "Package": "liblerc-dev",
+      "Version": "4.0.0+ds-5",
+      "Architecture": "i386",
+      "Depends": "liblerc4 (= 4.0.0+ds-5)",
+      "Filename": "pool/main/l/lerc/liblerc-dev_4.0.0+ds-5_i386.deb",
+      "SHA256": "80758fbca25f5e0b056cb08525ac14904290e0a597316d28c6148af0e0870135",
+      "url": "https://deb.debian.org/debian/pool/main/l/lerc/liblerc-dev_4.0.0+ds-5_i386.deb"
+    },
+    {
+      "Package": "liblerc4",
+      "Version": "4.0.0+ds-5",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.29), libgcc-s1 (>= 3.3.1), libstdc++6 (>= 11)",
+      "Filename": "pool/main/l/lerc/liblerc4_4.0.0+ds-5_i386.deb",
+      "SHA256": "dd5c72d8e4b6098c6d343923fae6fa086b560e7c1b8e8e8f5e8b537e6dc7eb2e",
+      "url": "https://deb.debian.org/debian/pool/main/l/lerc/liblerc4_4.0.0+ds-5_i386.deb"
+    },
+    {
+      "Package": "liblz4-1",
+      "Version": "1.10.0-4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxxhash0 (>= 0.6.5)",
+      "Filename": "pool/main/l/lz4/liblz4-1_1.10.0-4_i386.deb",
+      "SHA256": "fe6cd86290b0abbebf356f3ac5e876cabcc736711615c3e0ae74ad8c0b494b12",
+      "url": "https://deb.debian.org/debian/pool/main/l/lz4/liblz4-1_1.10.0-4_i386.deb"
+    },
+    {
+      "Package": "liblz4-dev",
+      "Version": "1.10.0-4",
+      "Architecture": "i386",
+      "Depends": "liblz4-1 (= 1.10.0-4), libxxhash-dev",
+      "Filename": "pool/main/l/lz4/liblz4-dev_1.10.0-4_i386.deb",
+      "SHA256": "5d6ee96622437df1810c0c1a02027aaf614e0e467692555b17f33ccc4643a54d",
+      "url": "https://deb.debian.org/debian/pool/main/l/lz4/liblz4-dev_1.10.0-4_i386.deb"
+    },
+    {
+      "Package": "liblzma-dev",
+      "Version": "5.8.1-1+deb13u2",
+      "Architecture": "i386",
+      "Depends": "liblzma5 (= 5.8.1-1+deb13u2)",
+      "Filename": "pool/updates/main/x/xz-utils/liblzma-dev_5.8.1-1+deb13u2_i386.deb",
+      "SHA256": "f7875fcd19b9d83095dc5b4abe02f365d3afd6d6a087150631140c7a2d33d3d0",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/x/xz-utils/liblzma-dev_5.8.1-1+deb13u2_i386.deb"
+    },
+    {
+      "Package": "liblzma5",
+      "Version": "5.8.1-1+deb13u2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/updates/main/x/xz-utils/liblzma5_5.8.1-1+deb13u2_i386.deb",
+      "SHA256": "d37759a38fe8814b9b2cc5c8083064cd290ffaa85408968643be5b6f11903b96",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/x/xz-utils/liblzma5_5.8.1-1+deb13u2_i386.deb"
+    },
+    {
+      "Package": "libmd0",
+      "Version": "1.1.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.33)",
+      "Filename": "pool/main/libm/libmd/libmd0_1.1.0-2+b1_i386.deb",
+      "SHA256": "42e150e95df064f5e9704cca46fc6d5755416681c96811cfa468e5a638dd425d",
+      "url": "https://deb.debian.org/debian/pool/main/libm/libmd/libmd0_1.1.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libmount-dev",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libblkid-dev, libc6-dev | libc-dev, libmount1 (= 2.41.5-0+deb13u1), libselinux1-dev",
+      "Filename": "pool/main/u/util-linux/libmount-dev_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "7ad22b37bd7e0258e2dcc67f08a69f22a5913846e8f672538a03c47afb86990d",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/libmount-dev_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libmount1",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libblkid1 (= 2.41.5-0+deb13u1), libc6 (>= 2.38), libselinux1 (>= 3.1~)",
+      "Filename": "pool/main/u/util-linux/libmount1_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "d93e3014d2af147b4a5e6324ce28dd83f12d0375c7398c6d5f9e185eb6304577",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/libmount1_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libncursesw6",
+      "Version": "6.5+20250216-2",
+      "Architecture": "i386",
+      "Depends": "libtinfo6 (= 6.5+20250216-2), libc6 (>= 2.34)",
+      "Filename": "pool/main/n/ncurses/libncursesw6_6.5+20250216-2_i386.deb",
+      "SHA256": "4f237d908885070922d237edeeaf261e8e216ca346fa76880283be36cc4424fb",
+      "url": "https://deb.debian.org/debian/pool/main/n/ncurses/libncursesw6_6.5+20250216-2_i386.deb"
+    },
+    {
+      "Package": "libnettle8t64",
+      "Version": "3.10.1-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/n/nettle/libnettle8t64_3.10.1-1_i386.deb",
+      "SHA256": "6daa71300749e0ec1e0792dc4b1886ffae6668317d363aa13c2f30f3b8d96792",
+      "url": "https://deb.debian.org/debian/pool/main/n/nettle/libnettle8t64_3.10.1-1_i386.deb"
+    },
+    {
+      "Package": "libnghttp2-14",
+      "Version": "1.64.0-1.1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.17)",
+      "Filename": "pool/main/n/nghttp2/libnghttp2-14_1.64.0-1.1+deb13u1_i386.deb",
+      "SHA256": "18ce615b00c11b21bddf2e008e7651d760a01c18c65fd87acd5ee3b8e4b442cf",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/n/nghttp2/libnghttp2-14_1.64.0-1.1+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libnghttp2-dev",
+      "Version": "1.64.0-1.1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libnghttp2-14 (= 1.64.0-1.1+deb13u1), pkgconf",
+      "Filename": "pool/main/n/nghttp2/libnghttp2-dev_1.64.0-1.1+deb13u1_i386.deb",
+      "SHA256": "3cc954669301bfb7adcd6a2338876bf73a00a0bd92088a3d55348d33fdccaa56",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/n/nghttp2/libnghttp2-dev_1.64.0-1.1+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libnghttp3-9",
+      "Version": "1.8.0-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/n/nghttp3/libnghttp3-9_1.8.0-1_i386.deb",
+      "SHA256": "da84bebd0ec6e1e960e39597dfc40522bca37cfb181c3c9f944d2e6e9e028c7f",
+      "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/libnghttp3-9_1.8.0-1_i386.deb"
+    },
+    {
+      "Package": "libnghttp3-dev",
+      "Version": "1.8.0-1",
+      "Architecture": "i386",
+      "Depends": "libnghttp3-9 (= 1.8.0-1)",
+      "Filename": "pool/main/n/nghttp3/libnghttp3-dev_1.8.0-1_i386.deb",
+      "SHA256": "3926239e091c93f6c41f3f689666ec8d045d6f98650fdbe8e9228bbee6c4ba8f",
+      "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/libnghttp3-dev_1.8.0-1_i386.deb"
+    },
+    {
+      "Package": "libp11-kit-dev",
+      "Version": "0.25.5-3",
+      "Architecture": "i386",
+      "Depends": "libp11-kit0 (= 0.25.5-3)",
+      "Filename": "pool/main/p/p11-kit/libp11-kit-dev_0.25.5-3_i386.deb",
+      "SHA256": "e46a2630b39c6f188d9f0bbdc01846c1aeed13e4d7118c8edc3114705b2c49bb",
+      "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/libp11-kit-dev_0.25.5-3_i386.deb"
+    },
+    {
+      "Package": "libp11-kit0",
+      "Version": "0.25.5-3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libffi8 (>= 3.4)",
+      "Filename": "pool/main/p/p11-kit/libp11-kit0_0.25.5-3_i386.deb",
+      "SHA256": "87454329e53dab3176c2f61f50386ac2c42d6088a68fb882b3804f8bc0ba7660",
+      "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/libp11-kit0_0.25.5-3_i386.deb"
+    },
+    {
+      "Package": "libpcre2-16-0",
+      "Version": "10.46-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/updates/main/p/pcre2/libpcre2-16-0_10.46-1~deb13u3_i386.deb",
+      "SHA256": "2de8705cfa11dc2aa4b00f46319ac80953a588026686c334ad7b27eb1daa8915",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/p/pcre2/libpcre2-16-0_10.46-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libpcre2-32-0",
+      "Version": "10.46-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/updates/main/p/pcre2/libpcre2-32-0_10.46-1~deb13u3_i386.deb",
+      "SHA256": "6bbd188150de900f0e7bb174cb0408df8f3118fdc149214b9890fc3dac2e613c",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/p/pcre2/libpcre2-32-0_10.46-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libpcre2-8-0",
+      "Version": "10.46-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/updates/main/p/pcre2/libpcre2-8-0_10.46-1~deb13u3_i386.deb",
+      "SHA256": "7a80279bab807488dd0ef63e068b136cb862bcbda73f853451fd2e65e443ebce",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/p/pcre2/libpcre2-8-0_10.46-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libpcre2-dev",
+      "Version": "10.46-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc-dev, libpcre2-8-0 (= 10.46-1~deb13u3), libpcre2-16-0 (= 10.46-1~deb13u3), libpcre2-32-0 (= 10.46-1~deb13u3), libpcre2-posix3 (= 10.46-1~deb13u3)",
+      "Filename": "pool/updates/main/p/pcre2/libpcre2-dev_10.46-1~deb13u3_i386.deb",
+      "SHA256": "0f6314621300f8d32ea86a95ef5b978a88736493924447cffe5e016ce66281b5",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/p/pcre2/libpcre2-dev_10.46-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libpcre2-posix3",
+      "Version": "10.46-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libpcre2-8-0 (>= 10.22)",
+      "Filename": "pool/updates/main/p/pcre2/libpcre2-posix3_10.46-1~deb13u3_i386.deb",
+      "SHA256": "cf3e79cc0111ebda300c8be53266694e0268c21a5856578d051af5c2a645cbc1",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/p/pcre2/libpcre2-posix3_10.46-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libpkgconf3",
+      "Version": "1.8.1-4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/p/pkgconf/libpkgconf3_1.8.1-4_i386.deb",
+      "SHA256": "fc303e7890a0ff25f64cce9815be3aae9c73254b960628aef24cf77f79f418d6",
+      "url": "https://deb.debian.org/debian/pool/main/p/pkgconf/libpkgconf3_1.8.1-4_i386.deb"
+    },
+    {
+      "Package": "libpng-dev",
+      "Version": "1.6.48-1+deb13u6",
+      "Architecture": "i386",
+      "Depends": "libpng16-16t64 (= 1.6.48-1+deb13u6), zlib1g-dev",
+      "Filename": "pool/updates/main/libp/libpng1.6/libpng-dev_1.6.48-1+deb13u6_i386.deb",
+      "SHA256": "9a0028daed6148598c1dfbc1f882fc9a913577195350a18df45b519325ed97b6",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/libp/libpng1.6/libpng-dev_1.6.48-1+deb13u6_i386.deb"
+    },
+    {
+      "Package": "libpng16-16t64",
+      "Version": "1.6.48-1+deb13u6",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.29), zlib1g (>= 1:1.2.3.4)",
+      "Filename": "pool/updates/main/libp/libpng1.6/libpng16-16t64_1.6.48-1+deb13u6_i386.deb",
+      "SHA256": "087f92b31fa6c4ff047e539c944a3f97432d15b6b8e5ef4127a7e13b72643847",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/libp/libpng1.6/libpng16-16t64_1.6.48-1+deb13u6_i386.deb"
+    },
+    {
+      "Package": "libpsl-dev",
+      "Version": "0.21.2-1.1+b1",
+      "Architecture": "i386",
+      "Depends": "libpsl5t64 (= 0.21.2-1.1+b1)",
+      "Filename": "pool/main/libp/libpsl/libpsl-dev_0.21.2-1.1+b1_i386.deb",
+      "SHA256": "62bb1c062ab302467c81981dd90490ad262ff433868e86cb6e27d67eded49cc6",
+      "url": "https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl-dev_0.21.2-1.1+b1_i386.deb"
+    },
+    {
+      "Package": "libpsl5t64",
+      "Version": "0.21.2-1.1+b1",
+      "Architecture": "i386",
+      "Depends": "libidn2-0 (>= 0.16), libc6 (>= 2.33), libunistring5 (>= 1.1)",
+      "Filename": "pool/main/libp/libpsl/libpsl5t64_0.21.2-1.1+b1_i386.deb",
+      "SHA256": "9249ffed697cf6c0d47de46802e97b146e84048e0e01773201d932ea2f245f3b",
+      "url": "https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl5t64_0.21.2-1.1+b1_i386.deb"
+    },
+    {
+      "Package": "libpython3-stdlib",
+      "Version": "3.13.5-1",
+      "Architecture": "i386",
+      "Depends": "libpython3.13-stdlib (>= 3.13.5-1~)",
+      "Filename": "pool/main/p/python3-defaults/libpython3-stdlib_3.13.5-1_i386.deb",
+      "SHA256": "b713c58061012a40b92705bad73ac6188bd92fe0cb1b28a5452db7f9654ccac4",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3-defaults/libpython3-stdlib_3.13.5-1_i386.deb"
+    },
+    {
+      "Package": "libpython3.13-minimal",
+      "Version": "3.13.5-2+deb13u5",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libssl3t64 (>= 3.4.0)",
+      "Filename": "pool/main/p/python3.13/libpython3.13-minimal_3.13.5-2+deb13u5_i386.deb",
+      "SHA256": "7edae1d2f9fd4f89bbc5217a683704920f8e1dc088e01192ce24a86af1eca189",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3.13/libpython3.13-minimal_3.13.5-2+deb13u5_i386.deb"
+    },
+    {
+      "Package": "libpython3.13-stdlib",
+      "Version": "3.13.5-2+deb13u5",
+      "Architecture": "i386",
+      "Depends": "libpython3.13-minimal (= 3.13.5-2+deb13u5), media-types | mime-support, netbase, tzdata, libbz2-1.0, libc6 (>= 2.38), libdb5.3t64, libffi8 (>= 3.4), liblzma5 (>= 5.1.1alpha+20120614), libncursesw6 (>= 6.1), libreadline8t64 (>= 7.0~beta), libsqlite3-0 (>= 3.36.0), libtinfo6 (>= 6), libuuid1 (>= 2.20.1)",
+      "Filename": "pool/main/p/python3.13/libpython3.13-stdlib_3.13.5-2+deb13u5_i386.deb",
+      "SHA256": "8a7f91f1d8a353ece290a015273a8bc21259c6f750b20a253e7afa153d8e2d45",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3.13/libpython3.13-stdlib_3.13.5-2+deb13u5_i386.deb"
+    },
+    {
+      "Package": "libquadmath0",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.38)",
+      "Filename": "pool/main/g/gcc-14/libquadmath0_14.2.0-19_i386.deb",
+      "SHA256": "f132ac14582c9cb5d8a1925395e7a6e3a403d3359761c4c904a3381cfef85005",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libquadmath0_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libreadline8t64",
+      "Version": "8.2-6",
+      "Architecture": "i386",
+      "Depends": "readline-common, libc6 (>= 2.38), libtinfo6 (>= 6)",
+      "Filename": "pool/main/r/readline/libreadline8t64_8.2-6_i386.deb",
+      "SHA256": "87f68eeeadde39bc92baff9928b8d392b48b03a45f8027173dcfc46670cd1912",
+      "url": "https://deb.debian.org/debian/pool/main/r/readline/libreadline8t64_8.2-6_i386.deb"
+    },
+    {
+      "Package": "librtmp-dev",
+      "Version": "2.4+20151223.gitfa8646d.1-2+b5",
+      "Architecture": "i386",
+      "Depends": "librtmp1 (= 2.4+20151223.gitfa8646d.1-2+b5), libgmp-dev, libgnutls28-dev, nettle-dev, zlib1g-dev",
+      "Filename": "pool/main/r/rtmpdump/librtmp-dev_2.4+20151223.gitfa8646d.1-2+b5_i386.deb",
+      "SHA256": "a62839fa0515265900b96f8611c9db6e3f79143b7b934d0ff6cc486dfa47c88a",
+      "url": "https://deb.debian.org/debian/pool/main/r/rtmpdump/librtmp-dev_2.4+20151223.gitfa8646d.1-2+b5_i386.deb"
+    },
+    {
+      "Package": "librtmp1",
+      "Version": "2.4+20151223.gitfa8646d.1-2+b5",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), libgmp10 (>= 2:6.3.0+dfsg), libgnutls30t64 (>= 3.8.1), libhogweed6t64, libnettle8t64, zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/r/rtmpdump/librtmp1_2.4+20151223.gitfa8646d.1-2+b5_i386.deb",
+      "SHA256": "164416a85aea3ef0ce5c208b9f9fb036a58071b0d3c3a20f60c93f19c29c0f54",
+      "url": "https://deb.debian.org/debian/pool/main/r/rtmpdump/librtmp1_2.4+20151223.gitfa8646d.1-2+b5_i386.deb"
+    },
+    {
+      "Package": "libsasl2-2",
+      "Version": "2.1.28+dfsg1-9",
+      "Architecture": "i386",
+      "Depends": "libsasl2-modules-db (>= 2.1.28+dfsg1-9), libc6 (>= 2.38), libssl3t64 (>= 3.0.0)",
+      "Filename": "pool/main/c/cyrus-sasl2/libsasl2-2_2.1.28+dfsg1-9_i386.deb",
+      "SHA256": "ab342082bfd4148641e976c33824aa53667da40bdf2a7f97bf1c3284239bdf4f",
+      "url": "https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/libsasl2-2_2.1.28+dfsg1-9_i386.deb"
+    },
+    {
+      "Package": "libsasl2-modules-db",
+      "Version": "2.1.28+dfsg1-9",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libdb5.3t64",
+      "Filename": "pool/main/c/cyrus-sasl2/libsasl2-modules-db_2.1.28+dfsg1-9_i386.deb",
+      "SHA256": "9c26488046f3d9102b3246d694f7ac42ece63e5eb00dd4aff56ebc6fa0da4020",
+      "url": "https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/libsasl2-modules-db_2.1.28+dfsg1-9_i386.deb"
+    },
+    {
+      "Package": "libselinux1",
+      "Version": "3.8.1-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libpcre2-8-0 (>= 10.22)",
+      "Filename": "pool/main/libs/libselinux/libselinux1_3.8.1-1_i386.deb",
+      "SHA256": "9d5628efff228a00a804638409e3c265ada5cf5ccc6eb25cf37865179c945f74",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux1_3.8.1-1_i386.deb"
+    },
+    {
+      "Package": "libselinux1-dev",
+      "Version": "3.8.1-1",
+      "Architecture": "i386",
+      "Depends": "libselinux1 (= 3.8.1-1), libsepol-dev (>= 3.8.1), libpcre2-dev",
+      "Filename": "pool/main/libs/libselinux/libselinux1-dev_3.8.1-1_i386.deb",
+      "SHA256": "33a39aa510ca2663b848cf1f50675a30a5e19443645ae00103af7de89d76d6d3",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux1-dev_3.8.1-1_i386.deb"
+    },
+    {
+      "Package": "libsepol-dev",
+      "Version": "3.8.1-1",
+      "Architecture": "i386",
+      "Depends": "libsepol2 (= 3.8.1-1)",
+      "Filename": "pool/main/libs/libsepol/libsepol-dev_3.8.1-1_i386.deb",
+      "SHA256": "8a19f743c4a3aca44dcc94b85f2889cc18958eacea5a53f8bf1d26520d6dae5c",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libsepol/libsepol-dev_3.8.1-1_i386.deb"
+    },
+    {
+      "Package": "libsepol2",
+      "Version": "3.8.1-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/libs/libsepol/libsepol2_3.8.1-1_i386.deb",
+      "SHA256": "1d9793d8334ae5adb35b1bdfc0aeac927cf1f21683ac23ff9e9afc126b7ed00e",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libsepol/libsepol2_3.8.1-1_i386.deb"
+    },
+    {
+      "Package": "libsharpyuv-dev",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libsharpyuv0 (= 1.5.0-0.1)",
+      "Filename": "pool/main/libw/libwebp/libsharpyuv-dev_1.5.0-0.1_i386.deb",
+      "SHA256": "6cf1ed71077ff8600eed3151a6acb739b1e4fe9b501dccb9028abf61fd6d3eb1",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libsharpyuv-dev_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libsharpyuv0",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.29)",
+      "Filename": "pool/main/libw/libwebp/libsharpyuv0_1.5.0-0.1_i386.deb",
+      "SHA256": "a8058cf965bdc6d66b14e47699ad9da57140c1008ac477cd73d2a8206ba18e85",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libsharpyuv0_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libsqlite3-0",
+      "Version": "3.46.1-7+deb13u2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/s/sqlite3/libsqlite3-0_3.46.1-7+deb13u2_i386.deb",
+      "SHA256": "1071476dbe1efb0aef16bbaed98de853fe82c496cd22e75ce9e1545f1e163209",
+      "url": "https://deb.debian.org/debian/pool/main/s/sqlite3/libsqlite3-0_3.46.1-7+deb13u2_i386.deb"
+    },
+    {
+      "Package": "libssh2-1-dev",
+      "Version": "1.11.1-1+deb13u2",
+      "Architecture": "i386",
+      "Depends": "libssh2-1t64 (= 1.11.1-1+deb13u2), libssl-dev, zlib1g-dev",
+      "Filename": "pool/main/libs/libssh2/libssh2-1-dev_1.11.1-1+deb13u2_i386.deb",
+      "SHA256": "65db9f767f86c065dbdf3d1f4d90728abc3da61b4c948655d20f28d760463b7a",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2-1-dev_1.11.1-1+deb13u2_i386.deb"
+    },
+    {
+      "Package": "libssh2-1t64",
+      "Version": "1.11.1-1+deb13u2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.28), libssl3t64 (>= 3.0.0), zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/libs/libssh2/libssh2-1t64_1.11.1-1+deb13u2_i386.deb",
+      "SHA256": "35c86edc19345c5fb606cd789240e1d6c034510d9a60cfa31b588744138c26b2",
+      "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2-1t64_1.11.1-1+deb13u2_i386.deb"
+    },
+    {
+      "Package": "libssl-dev",
+      "Version": "3.5.7-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libssl3t64 (= 3.5.7-1~deb13u3)",
+      "Filename": "pool/updates/main/o/openssl/libssl-dev_3.5.7-1~deb13u3_i386.deb",
+      "SHA256": "a78cd670a342b73ef4015361c1343f6b82da046c287057d7f0ddbf7ba996ca1b",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/o/openssl/libssl-dev_3.5.7-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libssl3t64",
+      "Version": "3.5.7-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4), openssl-provider-legacy",
+      "Filename": "pool/updates/main/o/openssl/libssl3t64_3.5.7-1~deb13u3_i386.deb",
+      "SHA256": "c6988eab4110e14aa7306a9b32356bc9b699f7f657acdc0211a458f6d91819b5",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/o/openssl/libssl3t64_3.5.7-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "libstdc++6",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.38), libgcc-s1 (>= 7)",
+      "Filename": "pool/main/g/gcc-14/libstdc++6_14.2.0-19_i386.deb",
+      "SHA256": "b6020260b92a97ac33ae58a73b16f3ab31fed7632e9b861f7cd5fc393facd6ed",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libstdc++6_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libsysprof-capture-4-dev",
+      "Version": "48.0-2",
+      "Architecture": "i386",
+      "Filename": "pool/main/s/sysprof/libsysprof-capture-4-dev_48.0-2_i386.deb",
+      "SHA256": "6cb3eb722b0907c36f8fc8683864ba10aa1a7446a832c51c970e3d504b10ecc1",
+      "url": "https://deb.debian.org/debian/pool/main/s/sysprof/libsysprof-capture-4-dev_48.0-2_i386.deb"
+    },
+    {
+      "Package": "libtasn1-6",
+      "Version": "4.20.0-2+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/libt/libtasn1-6/libtasn1-6_4.20.0-2+deb13u1_i386.deb",
+      "SHA256": "e12a0eb8430e54eacdc4e650c93fb5c5db66594e0a3f5885127a3ab3ed275981",
+      "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0-2+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libtasn1-6-dev",
+      "Version": "4.20.0-2+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libtasn1-6 (= 4.20.0-2+deb13u1)",
+      "Filename": "pool/main/libt/libtasn1-6/libtasn1-6-dev_4.20.0-2+deb13u1_i386.deb",
+      "SHA256": "a9a9318421926e206a2675faedf0b3183bbb19e46aaf9d73a0f88121c52f1fec",
+      "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6-dev_4.20.0-2+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libtiff-dev",
+      "Version": "4.7.0-3+deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libjbig-dev, libjpeg-dev, liblzma-dev, libzstd-dev, libwebp-dev, libtiff6 (= 4.7.0-3+deb13u3), libtiffxx6 (= 4.7.0-3+deb13u3), zlib1g-dev, libdeflate-dev, liblerc-dev",
+      "Filename": "pool/main/t/tiff/libtiff-dev_4.7.0-3+deb13u3_i386.deb",
+      "SHA256": "171da526071d806586010414ae6ce0b8910679317384d107a9e0f385d6cd7030",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/t/tiff/libtiff-dev_4.7.0-3+deb13u3_i386.deb"
+    },
+    {
+      "Package": "libtiff6",
+      "Version": "4.7.0-3+deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.33), libdeflate0 (>= 1.0), libjbig0 (>= 2.0), libjpeg62-turbo (>= 1.3.1), liblerc4 (>= 3.0), liblzma5 (>= 5.1.1alpha+20120614), libwebp7 (>= 1.5.0), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)",
+      "Filename": "pool/main/t/tiff/libtiff6_4.7.0-3+deb13u3_i386.deb",
+      "SHA256": "9a3bcddc1d3d29ef886ae174546ae84e8ed43f0d5d55135ec742e771a99abecc",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/t/tiff/libtiff6_4.7.0-3+deb13u3_i386.deb"
+    },
+    {
+      "Package": "libtiffxx6",
+      "Version": "4.7.0-3+deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libstdc++6 (>= 13.1), libtiff6 (>= 4.0.3)",
+      "Filename": "pool/main/t/tiff/libtiffxx6_4.7.0-3+deb13u3_i386.deb",
+      "SHA256": "a630e3573e4b0c66a1d35481b1ec853e4677b85a1f252816eb46c8fb500f886e",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/t/tiff/libtiffxx6_4.7.0-3+deb13u3_i386.deb"
+    },
+    {
+      "Package": "libtinfo6",
+      "Version": "6.5+20250216-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/n/ncurses/libtinfo6_6.5+20250216-2_i386.deb",
+      "SHA256": "3488ab080c07056b2ddef81f3d75fac7358ebfd63ac04a224fa87571152f39b7",
+      "url": "https://deb.debian.org/debian/pool/main/n/ncurses/libtinfo6_6.5+20250216-2_i386.deb"
+    },
+    {
+      "Package": "libubsan1",
+      "Version": "14.2.0-19",
+      "Architecture": "i386",
+      "Depends": "gcc-14-base (= 14.2.0-19), libc6 (>= 2.34), libgcc-s1 (>= 3.3), libstdc++6 (>= 4.1.1)",
+      "Filename": "pool/main/g/gcc-14/libubsan1_14.2.0-19_i386.deb",
+      "SHA256": "edd34300d6122b586184849382cc63e8d581ad28a678a62b4742850dbc8ae8c6",
+      "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/libubsan1_14.2.0-19_i386.deb"
+    },
+    {
+      "Package": "libunbound8",
+      "Version": "1.26.2-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libevent-2.1-7t64 (>= 2.1.8-stable), libssl3t64 (>= 3.4.0)",
+      "Filename": "pool/updates/main/u/unbound/libunbound8_1.26.2-0+deb13u1_i386.deb",
+      "SHA256": "9a20a8e48b9a71b24636f185e5f13da2fd33fc72bd84b7894682e26baa1dad6c",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/unbound/libunbound8_1.26.2-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libunistring5",
+      "Version": "1.3-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/libu/libunistring/libunistring5_1.3-2_i386.deb",
+      "SHA256": "d7f66009fe785d4964ca749ddf38602d692e944847dfdef1ccf76b4d30e050b2",
+      "url": "https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring5_1.3-2_i386.deb"
+    },
+    {
+      "Package": "libuuid1",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/u/util-linux/libuuid1_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "44241a22bd0939e46e9f43ad96159c8154fdb6c440a15841ea77e834788958e4",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/libuuid1_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "libwebp-dev",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libwebp7 (= 1.5.0-0.1), libwebpdemux2 (= 1.5.0-0.1), libwebpmux3 (= 1.5.0-0.1), libwebpdecoder3 (= 1.5.0-0.1), libsharpyuv-dev",
+      "Filename": "pool/main/libw/libwebp/libwebp-dev_1.5.0-0.1_i386.deb",
+      "SHA256": "14f35a84f51b90f25d2faa2f27984536a4b357f47c4dc03691a073394f7005c6",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp-dev_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libwebp7",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), libsharpyuv0 (>= 1.5.0)",
+      "Filename": "pool/main/libw/libwebp/libwebp7_1.5.0-0.1_i386.deb",
+      "SHA256": "ba08d4c4f8d7829a081bac548d446aa3788d8ab3a32c8ac90012a26dc126b6a9",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp7_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libwebpdecoder3",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/libw/libwebp/libwebpdecoder3_1.5.0-0.1_i386.deb",
+      "SHA256": "e03d06f044b23495509d4c67cb8ef9f9e92e139fcabe04d2bd93d044d682a29d",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebpdecoder3_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libwebpdemux2",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libwebp7 (>= 1.5.0)",
+      "Filename": "pool/main/libw/libwebp/libwebpdemux2_1.5.0-0.1_i386.deb",
+      "SHA256": "2457dc2cecea72acab3299886c48c33eca28b3ac7eb907a7c7f2c32c001a7f5c",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebpdemux2_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libwebpmux3",
+      "Version": "1.5.0-0.1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.29), libwebp7 (>= 1.5.0)",
+      "Filename": "pool/main/libw/libwebp/libwebpmux3_1.5.0-0.1_i386.deb",
+      "SHA256": "2491bb9c147ebc98dda389082530233464453d9fdf06b485f75f90d82f111c3e",
+      "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebpmux3_1.5.0-0.1_i386.deb"
+    },
+    {
+      "Package": "libxau-dev",
+      "Version": "1:1.0.11-1",
+      "Architecture": "i386",
+      "Depends": "libxau6 (= 1:1.0.11-1), x11proto-dev",
+      "Filename": "pool/main/libx/libxau/libxau-dev_1.0.11-1_i386.deb",
+      "SHA256": "8ac273981b0efcc72659eee88dd3a64427958e8e14e93dcd09c807f7d71b09af",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau-dev_1.0.11-1_i386.deb"
+    },
+    {
+      "Package": "libxau6",
+      "Version": "1:1.0.11-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.33)",
+      "Filename": "pool/main/libx/libxau/libxau6_1.0.11-1_i386.deb",
+      "SHA256": "1645415b2ea8b64268f87944b733b9f9a2f243f89eb73555120eaf459fa06a57",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau6_1.0.11-1_i386.deb"
+    },
+    {
+      "Package": "libxcb-composite0",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxcb1",
+      "Filename": "pool/main/libx/libxcb/libxcb-composite0_1.17.0-2+b1_i386.deb",
+      "SHA256": "93a154ca78a5c53ae7e4a163f0c75b1f133d808e8ad93a239f55af9f39976c40",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-composite0_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-composite0-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb-composite0 (= 1.17.0-2+b1), libxcb1-dev, libxcb-xfixes0-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb-composite0-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "4505c8fcb848416ef7d868c46e126a6a0d233f9f0eced97f5ffce9ab1a3e5703",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-composite0-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-render0",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxcb1 (>= 1.8)",
+      "Filename": "pool/main/libx/libxcb/libxcb-render0_1.17.0-2+b1_i386.deb",
+      "SHA256": "c09a7363cbc58279b4d23ae72358496cd065d7099e9f9f216dee32928abd1e8c",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-render0_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-render0-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb-render0 (= 1.17.0-2+b1), libxcb1-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb-render0-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "5728b1c1c8c8fb79cef00d1ee70808a2a34f3d2e50bfcd92044612290d384558",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-render0-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-screensaver0",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxcb1",
+      "Filename": "pool/main/libx/libxcb/libxcb-screensaver0_1.17.0-2+b1_i386.deb",
+      "SHA256": "0af2f5749994f8ac2ee34d9855dba5a31d2edf038a14d478a964058ff36b3fe0",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-screensaver0_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-screensaver0-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb-screensaver0 (= 1.17.0-2+b1), libxcb1-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb-screensaver0-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "02f85bb55df03dc63635f7765d613ada22479ece70c2876b0b346809af500862",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-screensaver0-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-shape0",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxcb1",
+      "Filename": "pool/main/libx/libxcb/libxcb-shape0_1.17.0-2+b1_i386.deb",
+      "SHA256": "52ed332f6331745abf51f313a9e161be0029a4ccafe6c6211f903ab77657bd2d",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-shape0_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-shape0-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb-shape0 (= 1.17.0-2+b1), libxcb1-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb-shape0-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "b410752f3466dd26ca2704388733d63643127292ba3c7b6b00f41c22dfcd9fe0",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-shape0-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-xfixes0",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libxcb1",
+      "Filename": "pool/main/libx/libxcb/libxcb-xfixes0_1.17.0-2+b1_i386.deb",
+      "SHA256": "b715b1a5d5f41632b5c5592f1c413401cf1538d9788f8e8ab91448522f26b123",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-xfixes0_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb-xfixes0-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb-xfixes0 (= 1.17.0-2+b1), libxcb1-dev, libxcb-render0-dev, libxcb-shape0-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb-xfixes0-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "7fe8b0b67b13815c54459dcd73622709fc98131816b713612c8e78f61501e97c",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb-xfixes0-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb1",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libxau6 (>= 1:1.0.9), libxdmcp6",
+      "Filename": "pool/main/libx/libxcb/libxcb1_1.17.0-2+b1_i386.deb",
+      "SHA256": "a4c421cf27ef4f66b32f650e3ac8bbd12bc8ec28b70a3be5dcc56dc3453e8d3e",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb1_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxcb1-dev",
+      "Version": "1.17.0-2+b1",
+      "Architecture": "i386",
+      "Depends": "libxcb1 (= 1.17.0-2+b1), libxau-dev, libxdmcp-dev",
+      "Filename": "pool/main/libx/libxcb/libxcb1-dev_1.17.0-2+b1_i386.deb",
+      "SHA256": "1d77e6a4871d6cc763d52c6a89c73d7ad13dec78b9f7a5e8c1092368e10c28e4",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb1-dev_1.17.0-2+b1_i386.deb"
+    },
+    {
+      "Package": "libxdmcp-dev",
+      "Version": "1:1.1.5-1",
+      "Architecture": "i386",
+      "Depends": "libxdmcp6 (= 1:1.1.5-1), x11proto-dev",
+      "Filename": "pool/main/libx/libxdmcp/libxdmcp-dev_1.1.5-1_i386.deb",
+      "SHA256": "1abd3b2700feef7efd97807cbe7b92313b97a1dc9e8d9be54f37c36709c3ff4d",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp-dev_1.1.5-1_i386.deb"
+    },
+    {
+      "Package": "libxdmcp6",
+      "Version": "1:1.1.5-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.36)",
+      "Filename": "pool/main/libx/libxdmcp/libxdmcp6_1.1.5-1_i386.deb",
+      "SHA256": "06b3a5d82fd69b1ff66e4e68fd4cf55f616864a29f456609a1f92b275b6126f7",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp6_1.1.5-1_i386.deb"
+    },
+    {
+      "Package": "libxml2",
+      "Version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), liblzma5 (>= 5.1.1alpha+20120614), zlib1g (>= 1:1.2.3.4)",
+      "Filename": "pool/main/libx/libxml2/libxml2_2.12.7+dfsg+really2.9.14-2.1+deb13u3_i386.deb",
+      "SHA256": "361ae44454c7bbdb0a01a3564a9838a0fc5d32b563e4a7f03bcae8d4b484588b",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxml2/libxml2_2.12.7+dfsg+really2.9.14-2.1+deb13u3_i386.deb"
+    },
+    {
+      "Package": "libxml2-dev",
+      "Version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "Architecture": "i386",
+      "Depends": "libxml2 (= 2.12.7+dfsg+really2.9.14-2.1+deb13u3)",
+      "Filename": "pool/main/libx/libxml2/libxml2-dev_2.12.7+dfsg+really2.9.14-2.1+deb13u3_i386.deb",
+      "SHA256": "673136a8ca02cd85ff639b7cdf49429ce6f10ccd8edcba029f8c580b752dec36",
+      "url": "https://deb.debian.org/debian/pool/main/libx/libxml2/libxml2-dev_2.12.7+dfsg+really2.9.14-2.1+deb13u3_i386.deb"
+    },
+    {
+      "Package": "libxxhash-dev",
+      "Version": "0.8.3-2",
+      "Architecture": "i386",
+      "Depends": "libxxhash0 (= 0.8.3-2)",
+      "Filename": "pool/main/x/xxhash/libxxhash-dev_0.8.3-2_i386.deb",
+      "SHA256": "9c75a002d8d3080dd6f9593322df01b274e2a58966a864ec5733ee65efee62c5",
+      "url": "https://deb.debian.org/debian/pool/main/x/xxhash/libxxhash-dev_0.8.3-2_i386.deb"
+    },
+    {
+      "Package": "libxxhash0",
+      "Version": "0.8.3-2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/main/x/xxhash/libxxhash0_0.8.3-2_i386.deb",
+      "SHA256": "78feb19b3eaecf7c539c85c013fcd35e91a197836ce9e7703522842d1d75d918",
+      "url": "https://deb.debian.org/debian/pool/main/x/xxhash/libxxhash0_0.8.3-2_i386.deb"
+    },
+    {
+      "Package": "libzstd-dev",
+      "Version": "1.5.7+dfsg-1",
+      "Architecture": "i386",
+      "Depends": "libzstd1 (= 1.5.7+dfsg-1)",
+      "Filename": "pool/main/libz/libzstd/libzstd-dev_1.5.7+dfsg-1_i386.deb",
+      "SHA256": "5b78e1045fd34bec219a9037e8dea4c8f04d2429003ce255d0822d8554d7b408",
+      "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd-dev_1.5.7+dfsg-1_i386.deb"
+    },
+    {
+      "Package": "libzstd1",
+      "Version": "1.5.7+dfsg-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/libz/libzstd/libzstd1_1.5.7+dfsg-1_i386.deb",
+      "SHA256": "305f0ab5f16552c44906b3f3f6e9ad3eb33f6f857c3347fdf3bd987abd6989a9",
+      "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd1_1.5.7+dfsg-1_i386.deb"
+    },
+    {
+      "Package": "linux-libc-dev",
+      "Version": "6.12.117-1",
+      "Architecture": "all",
+      "Filename": "pool/updates/main/l/linux/linux-libc-dev_6.12.117-1_all.deb",
+      "SHA256": "8b4848725a2705e5b1612f2135c44300716690ba762368ab87df127e9a5ed416",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/l/linux/linux-libc-dev_6.12.117-1_all.deb"
+    },
+    {
+      "Package": "media-types",
+      "Version": "13.0.0",
+      "Architecture": "all",
+      "Filename": "pool/main/m/media-types/media-types_13.0.0_all.deb",
+      "SHA256": "0788e4b0b72db1bcf74a19cb24c3511e7770ad0b341f0f30e361701c3072f53e",
+      "url": "https://deb.debian.org/debian/pool/main/m/media-types/media-types_13.0.0_all.deb"
+    },
+    {
+      "Package": "native-architecture",
+      "Version": "0.2.6",
+      "Architecture": "all",
+      "Filename": "pool/main/a/architecture-properties/native-architecture_0.2.6_all.deb",
+      "SHA256": "cb065efb2dd0ad8de45ace298bdb959e4d66478ca8599312bde4fa543d8b7532",
+      "url": "https://deb.debian.org/debian/pool/main/a/architecture-properties/native-architecture_0.2.6_all.deb"
+    },
+    {
+      "Package": "netbase",
+      "Version": "6.5",
+      "Architecture": "all",
+      "Filename": "pool/main/n/netbase/netbase_6.5_all.deb",
+      "SHA256": "76bafa92947ebd37b0a6f9ec6570412041f56edebc1c66d323731216d318471e",
+      "url": "https://deb.debian.org/debian/pool/main/n/netbase/netbase_6.5_all.deb"
+    },
+    {
+      "Package": "nettle-dev",
+      "Version": "3.10.1-1",
+      "Architecture": "i386",
+      "Depends": "libnettle8t64 (= 3.10.1-1), libhogweed6t64 (= 3.10.1-1), libgmp-dev",
+      "Filename": "pool/main/n/nettle/nettle-dev_3.10.1-1_i386.deb",
+      "SHA256": "fac0c0ced2319d3b4104f4a99aec39d7c495b84356b340b5744221bb8c4dd98b",
+      "url": "https://deb.debian.org/debian/pool/main/n/nettle/nettle-dev_3.10.1-1_i386.deb"
+    },
+    {
+      "Package": "openssl-provider-legacy",
+      "Version": "3.5.7-1~deb13u3",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4), libssl3t64 (>= 3.0.3)",
+      "Filename": "pool/updates/main/o/openssl/openssl-provider-legacy_3.5.7-1~deb13u3_i386.deb",
+      "SHA256": "7dac484c67af83be8f86977aeeed2210606b1e26740a3342a64f79c3287aaa4d",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/o/openssl/openssl-provider-legacy_3.5.7-1~deb13u3_i386.deb"
+    },
+    {
+      "Package": "pkgconf",
+      "Version": "1.8.1-4",
+      "Architecture": "i386",
+      "Depends": "pkgconf-bin (>= 1.8.1-4)",
+      "Filename": "pool/main/p/pkgconf/pkgconf_1.8.1-4_i386.deb",
+      "SHA256": "3970191723d2b4847bf44bbb0735642b9a0b9dea66fefb365c2d23ddd86671f6",
+      "url": "https://deb.debian.org/debian/pool/main/p/pkgconf/pkgconf_1.8.1-4_i386.deb"
+    },
+    {
+      "Package": "pkgconf-bin",
+      "Version": "1.8.1-4",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34), libpkgconf3 (>= 1.8.0)",
+      "Filename": "pool/main/p/pkgconf/pkgconf-bin_1.8.1-4_i386.deb",
+      "SHA256": "d9e343123553850fa06ae749837d3321ce57f45868b33bae817a1d17213872e5",
+      "url": "https://deb.debian.org/debian/pool/main/p/pkgconf/pkgconf-bin_1.8.1-4_i386.deb"
+    },
+    {
+      "Package": "python3",
+      "Version": "3.13.5-1",
+      "Architecture": "i386",
+      "Depends": "python3.13 (>= 3.13.5-1~), libpython3-stdlib (= 3.13.5-1)",
+      "Pre-Depends": "python3-minimal (= 3.13.5-1)",
+      "Filename": "pool/main/p/python3-defaults/python3_3.13.5-1_i386.deb",
+      "SHA256": "ac86105b95d262c1f5e3dc945963e2768ba058caa1de1e9ce829e3a6ff169bb6",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3-defaults/python3_3.13.5-1_i386.deb"
+    },
+    {
+      "Package": "python3-minimal",
+      "Version": "3.13.5-1",
+      "Architecture": "i386",
+      "Depends": "dpkg (>= 1.13.20)",
+      "Pre-Depends": "python3.13-minimal (>= 3.13.5-1~)",
+      "Filename": "pool/main/p/python3-defaults/python3-minimal_3.13.5-1_i386.deb",
+      "SHA256": "0be12a96792d20257ec1f23fd2dbab92dc9ac2497ce4d13831ec8224e98f7139",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3-defaults/python3-minimal_3.13.5-1_i386.deb"
+    },
+    {
+      "Package": "python3-packaging",
+      "Version": "25.0-1",
+      "Architecture": "all",
+      "Depends": "python3:any",
+      "Filename": "pool/main/p/python-packaging/python3-packaging_25.0-1_all.deb",
+      "SHA256": "d70c8469f6e9c6105e1ebcd3ebdc963f11dadbeddd89d2d1a2a3cb1c97d2ecbc",
+      "url": "https://deb.debian.org/debian/pool/main/p/python-packaging/python3-packaging_25.0-1_all.deb"
+    },
+    {
+      "Package": "python3.13",
+      "Version": "3.13.5-2+deb13u5",
+      "Architecture": "i386",
+      "Depends": "python3.13-minimal (= 3.13.5-2+deb13u5), libpython3.13-stdlib (= 3.13.5-2+deb13u5), media-types | mime-support, tzdata",
+      "Filename": "pool/main/p/python3.13/python3.13_3.13.5-2+deb13u5_i386.deb",
+      "SHA256": "d9d48754d06010fc4bda82a2f816554ea7fa4fe3b0f0cea48b4b2284bcdaaeb1",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3.13/python3.13_3.13.5-2+deb13u5_i386.deb"
+    },
+    {
+      "Package": "python3.13-minimal",
+      "Version": "3.13.5-2+deb13u5",
+      "Architecture": "i386",
+      "Depends": "libpython3.13-minimal (= 3.13.5-2+deb13u5), libexpat1 (>= 2.6.0), zlib1g (>= 1:1.2.0)",
+      "Pre-Depends": "libc6 (>= 2.38)",
+      "Filename": "pool/main/p/python3.13/python3.13-minimal_3.13.5-2+deb13u5_i386.deb",
+      "SHA256": "35de3483b04d76e799700f77a4a88e7169bbcf886163538049663f65f98f00b5",
+      "url": "https://deb.debian.org/debian/pool/main/p/python3.13/python3.13-minimal_3.13.5-2+deb13u5_i386.deb"
+    },
+    {
+      "Package": "readline-common",
+      "Version": "8.2-6",
+      "Architecture": "all",
+      "Filename": "pool/main/r/readline/readline-common_8.2-6_all.deb",
+      "SHA256": "f77e8aa0bf0de618f11cb0b21658a4ed60f177d63b3cf26d7fc3706b6d0eaaa9",
+      "url": "https://deb.debian.org/debian/pool/main/r/readline/readline-common_8.2-6_all.deb"
+    },
+    {
+      "Package": "rpcsvc-proto",
+      "Version": "1.4.3-1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.34)",
+      "Filename": "pool/main/r/rpcsvc-proto/rpcsvc-proto_1.4.3-1_i386.deb",
+      "SHA256": "3900d246041e9cd5c7f69a08353c27c62360e9233e9e6032e6c732f767b9bf37",
+      "url": "https://deb.debian.org/debian/pool/main/r/rpcsvc-proto/rpcsvc-proto_1.4.3-1_i386.deb"
+    },
+    {
+      "Package": "shared-mime-info",
+      "Version": "2.4-5+b2",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.38), libgcc-s1 (>= 3.0), libglib2.0-0t64 (>= 2.76.0), libstdc++6 (>= 12), libxml2 (>= 2.7.4)",
+      "Filename": "pool/main/s/shared-mime-info/shared-mime-info_2.4-5+b2_i386.deb",
+      "SHA256": "13e0407ef30ce9c32adfbe62f22bd252bc7399eadac2a5333e474a7b96cddf0c",
+      "url": "https://deb.debian.org/debian/pool/main/s/shared-mime-info/shared-mime-info_2.4-5+b2_i386.deb"
+    },
+    {
+      "Package": "tar",
+      "Version": "1.35+dfsg-3.1",
+      "Architecture": "i386",
+      "Pre-Depends": "libacl1 (>= 2.2.23), libc6 (>= 2.38), libselinux1 (>= 3.1~)",
+      "Filename": "pool/main/t/tar/tar_1.35+dfsg-3.1_i386.deb",
+      "SHA256": "6654ce6962697e802242a1b0897ff3bd6c9af5f49de98132bd514a74e44730f9",
+      "url": "https://deb.debian.org/debian/pool/main/t/tar/tar_1.35+dfsg-3.1_i386.deb"
+    },
+    {
+      "Package": "tzdata",
+      "Version": "2026c-0+deb13u1",
+      "Architecture": "all",
+      "Depends": "debconf (>= 0.5) | debconf-2.0",
+      "Filename": "pool/main/t/tzdata/tzdata_2026c-0+deb13u1_all.deb",
+      "SHA256": "813b9bbbe14ccda2b24617b8bade0ade4d745957e75921766c153d249886bd4c",
+      "url": "https://deb.debian.org/debian/pool/main/t/tzdata/tzdata_2026c-0+deb13u1_all.deb"
+    },
+    {
+      "Package": "uuid-dev",
+      "Version": "2.41.5-0+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6-dev | libc-dev, libuuid1 (= 2.41.5-0+deb13u1)",
+      "Filename": "pool/main/u/util-linux/uuid-dev_2.41.5-0+deb13u1_i386.deb",
+      "SHA256": "ba32f8fc0ffa61d37f3fd5b2c29f437bad0b8b94934af9827d78c91f278fb13f",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/u/util-linux/uuid-dev_2.41.5-0+deb13u1_i386.deb"
+    },
+    {
+      "Package": "x11proto-dev",
+      "Version": "2024.1-1",
+      "Architecture": "all",
+      "Depends": "xorg-sgml-doctools (>= 1:1.5)",
+      "Filename": "pool/main/x/xorgproto/x11proto-dev_2024.1-1_all.deb",
+      "SHA256": "6a6764500eb8171d3cd6d793c09902974f8ea87bd20c68d9eac5f1eeaf3fc407",
+      "url": "https://deb.debian.org/debian/pool/main/x/xorgproto/x11proto-dev_2024.1-1_all.deb"
+    },
+    {
+      "Package": "xorg-sgml-doctools",
+      "Version": "1:1.11-1.1",
+      "Architecture": "all",
+      "Filename": "pool/main/x/xorg-sgml-doctools/xorg-sgml-doctools_1.11-1.1_all.deb",
+      "SHA256": "168345058319094e475a87ace66f5fb6ae802109650ea8434d672117982b5d0a",
+      "url": "https://deb.debian.org/debian/pool/main/x/xorg-sgml-doctools/xorg-sgml-doctools_1.11-1.1_all.deb"
+    },
+    {
+      "Package": "zlib1g",
+      "Version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "libc6 (>= 2.4)",
+      "Filename": "pool/updates/main/z/zlib/zlib1g_1.3.dfsg+really1.3.1-1+deb13u1_i386.deb",
+      "SHA256": "afae7e13993b441bcedf77b1497d81483ed0cec29c2ed90abbc03a46edb93754",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/z/zlib/zlib1g_1.3.dfsg+really1.3.1-1+deb13u1_i386.deb"
+    },
+    {
+      "Package": "zlib1g-dev",
+      "Version": "1:1.3.dfsg+really1.3.1-1+deb13u1",
+      "Architecture": "i386",
+      "Depends": "zlib1g (= 1:1.3.dfsg+really1.3.1-1+deb13u1), libc6-dev | libc-dev",
+      "Filename": "pool/updates/main/z/zlib/zlib1g-dev_1.3.dfsg+really1.3.1-1+deb13u1_i386.deb",
+      "SHA256": "f27f1632576b623a00cb70a125c0b892fc879c4f68247bb55e3b8e1a9a5b7a0d",
+      "url": "https://deb.debian.org/debian-security/pool/updates/main/z/zlib/zlib1g-dev_1.3.dfsg+really1.3.1-1+deb13u1_i386.deb"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+diff --git a/src/snapshot/code-serializer.cc b/src/snapshot/code-serializer.cc
+index 9535229..6210e2f 100644
+--- a/src/snapshot/code-serializer.cc
++++ b/src/snapshot/code-serializer.cc
+@@ -450,6 +450,11 @@ MaybeHandle<SharedFunctionInfo> CodeSerializer::Deserialize(
+       cached_data, SerializedCodeData::SourceHash(source, origin_options),
+       &sanity_check_result);
+   if (sanity_check_result != SerializedCodeSanityCheckResult::kSuccess) {
++    if (getenv("V8_ACCEPT_FOREIGN_FLAG_HASH") != nullptr) {
++      PrintF(stderr, "[jsc] cache rejected, reason=%d (1 magic, 2 version, 3 source, 4 flags, "
++                     "5 checksum, 6 invalid header, 7 length)\n",
++             static_cast<int>(sanity_check_result));
++    }
+     if (v8_flags.profile_deserialization)
+       PrintF("[Cached code failed check]\n");
+     DCHECK(cached_data->rejected());
+@@ -671,6 +676,10 @@ SerializedCodeSanityCheckResult SerializedCodeData::SanityCheckJustSource(
+ 
+ SerializedCodeSanityCheckResult SerializedCodeData::SanityCheckWithoutSource()
+     const {
++  if (getenv("V8_ACCEPT_FOREIGN_FLAG_HASH") != nullptr) {
++    PrintF(stderr, "[jsc] sanity check: size=%d header=%d\n", static_cast<int>(this->size_),
++           static_cast<int>(kHeaderSize));
++  }
+   if (this->size_ < kHeaderSize) {
+     return SerializedCodeSanityCheckResult::kInvalidHeader;
+   }
+@@ -684,7 +693,13 @@ SerializedCodeSanityCheckResult SerializedCodeData::SanityCheckWithoutSource()
+   }
+   uint32_t flags_hash = GetHeaderValue(kFlagHashOffset);
+   if (flags_hash != FlagList::Hash()) {
+-    return SerializedCodeSanityCheckResult::kFlagsMismatch;
++    // The flag hash covers every flag whose value differs from its default, including the ones
++    // V8 derives from the host CPU, so a cache produced by the same V8 version and build on
++    // another machine is rejected here even though its payload is compatible. Running such a
++    // cache is opt-in: V8_ACCEPT_FOREIGN_FLAG_HASH=1.
++    if (getenv("V8_ACCEPT_FOREIGN_FLAG_HASH") == nullptr) {
++      return SerializedCodeSanityCheckResult::kFlagsMismatch;
++    }
+   }
+   uint32_t payload_length = GetHeaderValue(kPayloadLengthOffset);
+   uint32_t max_payload_length = this->size_ - kHeaderSize;
+@@ -697,6 +712,10 @@ SerializedCodeSanityCheckResult SerializedCodeData::SanityCheckWithoutSource()
+       return SerializedCodeSanityCheckResult::kChecksumMismatch;
+     }
+   }
++  if (getenv("V8_ACCEPT_FOREIGN_FLAG_HASH") != nullptr) {
++    PrintF(stderr, "[jsc] header ok: magic=0x%08x version=0x%08x flags=0x%08x/self 0x%08x\n",
++           magic_number, version_hash, flags_hash, FlagList::Hash());
++  }
+   return SerializedCodeSanityCheckResult::kSuccess;
+ }
+ 

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose a screen or window</title>
+  <style>
+    :root { color-scheme: light dark; font-family: sans-serif; }
+    body { margin: 0; padding: 24px; box-sizing: border-box; height: 100vh; display: grid; grid-template-rows: auto auto auto minmax(3.5em, 1fr) auto auto; gap: 12px; overflow: auto; }
+    h1 { font-size: 1.35rem; margin: 0; }
+    p { margin: 0; line-height: 1.5; }
+    label { font-weight: 600; }
+    select { box-sizing: border-box; width: 100%; min-height: 0; font: inherit; padding: 8px; }
+    option { padding: 8px; white-space: normal; overflow-wrap: anywhere; }
+    footer { display: flex; gap: 12px; justify-content: flex-end; }
+    button { font: inherit; padding: 9px 16px; }
+    :focus-visible { outline: 3px solid #3b82f6; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <h1>Choose a screen or window</h1>
+  <p id="scope">Only the source you select will be shared. Nothing is selected automatically.</p>
+  <label for="sources">Available sources</label>
+  <select id="sources" size="8" aria-describedby="status" disabled></select>
+  <p id="status" role="status" aria-live="polite">Loading available sources…</p>
+  <footer>
+    <button id="cancel" type="button" autofocus>Cancel</button>
+    <button id="share" type="button" disabled>Share selected source</button>
+  </footer>
+</body>
+</html>

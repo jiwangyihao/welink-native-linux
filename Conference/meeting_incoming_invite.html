@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会议邀请</title>
+  <style>
+    :root { color-scheme: light dark; font-family: sans-serif; }
+    body { box-sizing: border-box; margin: 0; padding: 24px; height: 100vh; overflow: hidden; display: flex; flex-direction: column; gap: 16px; }
+    main { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 12px; }
+    h1 { margin: 0; font-size: 1.35rem; }
+    p { margin: 0; line-height: 1.6; }
+    #subject { font-size: 1.1rem; font-weight: 600; overflow-wrap: anywhere; unicode-bidi: plaintext; max-height: 6em; overflow: auto; }
+    #media { font-size: .9rem; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+    #privacy, #status { font-size: .9rem; }
+    footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: auto; }
+    button { font: inherit; padding: 9px 24px; }
+    :focus-visible { outline: 3px solid #3b82f6; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <h1 id="heading">会议邀请</h1>
+  <main>
+    <p id="subject" dir="auto"></p>
+    <p id="media" hidden></p>
+    <p id="disclosure">点击“接受”将发送接受邀请的真实请求，并非预览或演示。当前尚未加入会议。</p>
+    <p id="privacy">此提示窗口不会开启麦克风或摄像头。后续音视频由会议页面及权限设置决定。</p>
+    <p id="status" role="status" aria-live="polite">正在读取邀请…</p>
+  </main>
+  <footer aria-label="邀请操作">
+    <button id="decline" type="button" disabled>拒绝</button>
+    <button id="accept" type="button" aria-describedby="disclosure privacy" disabled>接受</button>
+  </footer>
+</body>
+</html>

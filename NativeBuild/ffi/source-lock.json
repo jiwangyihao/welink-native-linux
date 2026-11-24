@@ -1,0 +1,79 @@
+{
+  "formatVersion": 1,
+  "packageLockSha256": "bfc4504cfccd36eb50e31085ad8149731084ee24f6a31d0c339a24a3adcb8e4a",
+  "electron": {
+    "version": "22.3.26",
+    "nodeVersion": "16.17.1",
+    "nodeModuleVersion": 110,
+    "platform": "linux",
+    "architecture": "ia32",
+    "headers": {
+      "url": "https://artifacts.electronjs.org/headers/dist/v22.3.26/node-v22.3.26-headers.tar.gz",
+      "archive": "node-v22.3.26-headers.tar.gz",
+      "sha256": "96881df33d10df9fd4920db56931d1ef16f08562ab79555b29c1848acc331f5b",
+      "checksumUrl": "https://artifacts.electronjs.org/headers/dist/v22.3.26/SHASUMS256.txt",
+      "archiveRoot": "node_headers"
+    },
+    "licenses": [
+      {
+        "archive": "electron-LICENSE",
+        "url": "https://raw.githubusercontent.com/electron/electron/1c1c13234f606f80b5684d4846f4ab52df4a9d28/LICENSE",
+        "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d",
+        "directory": "electron-22.3.26"
+      },
+      {
+        "archive": "electron-node-LICENSE",
+        "url": "https://raw.githubusercontent.com/nodejs/node/6b06e89c7dfccec6792008302af1cee57649445c/LICENSE",
+        "sha256": "69090e865afa7c62715b97f0712632d2923bd7a5faba91f94e4e75a2f9219d5e",
+        "directory": "electron-node-16.17.1"
+      }
+    ]
+  },
+  "toolchain": {
+    "clangRevision": "llvmorg-16-init-6578-g0d30e92f-2",
+    "sysroot": "build/linux/debian_bullseye_i386-sysroot",
+    "sysrootUrl": "https://dev-cdn.electronjs.org/linux-sysroots/e26ddcc685b44db49c6fa5ed700961c539cf7e40/debian_bullseye_i386_sysroot.tar.xz",
+    "gccRuntime": "usr/lib/gcc/i686-linux-gnu/10",
+    "sha256": {
+      "third_party/llvm-build/Release+Asserts/bin/clang": "b4ef83894f60bd4efcd4d3c791c5499ca6d131ae94cb263c32445a5c424cf067",
+      "third_party/llvm-build/Release+Asserts/bin/clang++": "b4ef83894f60bd4efcd4d3c791c5499ca6d131ae94cb263c32445a5c424cf067",
+      "third_party/llvm-build/Release+Asserts/bin/ld.lld": "506fa120651afb810ff3e141584cb37e026e539769032c009b6ce0d6bb7c2607"
+    }
+  },
+  "libffi": {
+    "version": "3.3",
+    "source": "ffi-napi-4.0.3.tgz/package/deps/libffi",
+    "configuration": "config/linux/ia32",
+    "sourceChanges": []
+  },
+  "nativeSources": {
+    "ffi-napi": {
+      "version": "4.0.3",
+      "gitHead": "00df1232a25b1b0f026b5d1b4c9efc67497e4b48"
+    },
+    "ref-napi": {
+      "version": "3.0.3",
+      "gitHead": "d9ef81d29518e7fe398929a5ab775d19d1498d3d"
+    }
+  },
+  "sourceChanges": [],
+  "compatibility": {
+    "vendorPrivateVersions": {
+      "ffi-napi": "4.0.12",
+      "ref-napi": "4.0.8"
+    },
+    "selection": "Available paired upstream source releases, not equivalent numeric versions or a reconstruction of the unavailable vendor native addons.",
+    "ffiJavaScript": "Ignoring CRLF, all thirteen vendor ffi-napi lib files match upstream except dynamic_library.js and foreign_function.js: vendor ref.isAddress accepts PointerBuffer, upstream accepts genuine Buffer pointers.",
+    "refJavaScript": "Vendor ref adds PointerBuffer prototype methods and native int32 helpers, broadens allocCString null handling, and uses _attach after _writePointer; upstream 3.0.3 uses Buffer pointers and its own _writePointer(..., true) lifetime attachment. Never mix either release JS with the other release native addon.",
+    "consumerEvidence": "NativeIntegration/ffi.js, its library.js override and meeting_renderer.js use Library/DynamicLibrary.get/ForeignFunction/Callback and Buffer-compatible pointers. This does not prove compatibility with dynamically constructed or obfuscated names; acceptance against the exact user-supplied application remains required.",
+    "unsupportedVendorExtensions": [
+      "PointerBuffer",
+      "isAddress",
+      "readInt32",
+      "writeInt32"
+    ],
+    "abiPolicy": "Unmodified libffi Linux ia32 SYSV/default ABI and platform exports; no fabricated STDCALL/WIN32 aliases.",
+    "externalBuffers": "The upstream ref addon uses actual external ArrayBuffers. This build is only for the real Linux ia32 runtime, not a V8 sandboxed/x64 substitute.",
+    "libraryOverride": "Not applied here. Parent applies NativeIntegration/app-overrides/libraries/node_extends/node-ffi/ffi-napi/lib/library.js after assembly."
+  }
+}

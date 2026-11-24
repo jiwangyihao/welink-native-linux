@@ -1,0 +1,66 @@
+name: Self-contained source and native builds
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-smoke:
+    name: Source-only syntax, locks and offline registry smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20.19.0
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:smoke
+      - name: State acceptance boundary
+        run: echo 'Vendor-dependent acceptance is a separate local procedure in docs/BUILD.md, not a skipped or passing CI test.'
+
+  native-build:
+    name: Genuine ia32 libraries, workers and FFI (no vendor inputs)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20.19.0
+      - name: Install declared host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential cmake pkg-config python3 xz-utils binutils
+      - name: Acquire locked open-source inputs and build JSON-C
+        run: |
+          python3 NativeBuild/bootstrap.py --component toolchain --component deps --component sources --component ffi --component npm --component json-c
+      - name: Compile actual native implementations (checker requires a vendor baseline)
+        env:
+          WELINK_NATIVE_DEPS: ${{ github.workspace }}/.inputs/native-deps
+          WELINK_ELECTRON_SOURCE: ${{ github.workspace }}/.inputs/electron-toolchain
+        run: ./build.sh .work/native-libs native-only
+      - name: Compile paired upstream ia32 FFI addons
+        run: |
+          NativeBuild/build_ffi.sh --build-dir .work/ffi --output .work/ffi-output --electron-source .inputs/electron-toolchain
+      - name: Inspect native ELF headers without executing target binaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'NativeBuild/ffi')
+          from assemble import verify_elf32
+          paths = sorted(p for p in Path('.work/native-libs').iterdir() if p.is_file() and not p.name.startswith('.'))
+          if len(paths) != 16:
+              raise RuntimeError(f'Expected 16 non-checker native targets, found {len(paths)}')
+          for path in paths:
+              verify_elf32(path)
+          print(f'PASS ELF32/i386 headers for {len(paths)} real native targets; FFI assembly verified both addon headers.')
+          PY

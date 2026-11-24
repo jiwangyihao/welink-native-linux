@@ -1,0 +1,34 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 76bc010c7a4af..a2da9b124521b 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -1630,9 +1630,9 @@ if (!is_ios) {
+ }
+ 
+ # TODO(cassew): Add more OS's that don't support x86.
+-is_valid_x86_target =
+-    target_os != "ios" && target_os != "mac" &&
+-    (target_os != "linux" || use_libfuzzer || !build_with_chromium)
++# Local port: Linux x86 is only gated here (the libfuzzer and non-Chromium embedder builds
++# already use it), and this tree is built for a 32-bit Electron, so allow it.
++is_valid_x86_target = target_os != "ios" && target_os != "mac"
+ 
+ # Note: v8_target_cpu == arm allows using the V8 arm simulator on x86 for fuzzing.
+ assert(
+diff --git a/build/config/BUILD.gn b/build/config/BUILD.gn
+index 265d4bc070168..eca09f3b71532 100644
+--- a/build/config/BUILD.gn
++++ b/build/config/BUILD.gn
+@@ -221,6 +221,12 @@ config("default_libs") {
+       "pthread",
+       "rt",
+     ]
++
++    # 64-bit atomics are not lock-free on i386, so the compiler emits calls to the
++    # out-of-line __atomic_* helpers that live in libatomic.
++    if (current_cpu == "x86") {
++      libs += [ "atomic" ]
++    }
+   }
+ }
+ 

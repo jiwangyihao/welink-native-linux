@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <title>参会者部门与号码</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px sans-serif; }
+    body { margin: 24px; overflow-wrap: anywhere; } h1 { font-size: 1.25rem; }
+    dt { font-weight: bold; margin-top: 1em; } dd { margin: .3em 0; white-space: pre-line; }
+    button { padding: .4em 1em; font: inherit; }
+  </style>
+</head>
+<body>
+  <h1>参会者部门与号码</h1><p id="status" role="status">正在查询企业通讯录…</p>
+  <dl id="details" hidden><dt>部门</dt><dd id="dept"></dd><dt>备选号码</dt><dd id="numbers"></dd></dl>
+  <button id="close" type="button" autofocus>关闭</button>
+</body>
+</html>

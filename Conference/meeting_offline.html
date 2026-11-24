@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>WeLink 会议</title><link rel="stylesheet" href="meeting_offline_media.css"></head>
+<body><header><p id="progress" role="status">正在连接会议…</p><button id="cancel" type="button">退出会议</button>
+<p id="voice-state" role="status">匿名声纹保护尚未启用 / Anonymous voice protection is not enabled</p>
+<button id="voice-enroll" type="button" disabled>本次会议声纹保护… / Enroll voice for this room…</button>
+<button id="voice-disable" type="button" disabled>停用并删除声纹 / Disable and delete voiceprint</button>
+<details><summary>本机视频窗口 / Native video access</summary>
+<p>仅 X11 / Xwayland；允许同一显示服务器的程序读取按会议水印策略处理的视频。不会生成笔记图片。</p>
+<button id="render-surface-start" type="button" disabled>允许本机视频访问… / Allow native video access…</button>
+<button id="render-surface-inspect" type="button">查看原生窗口 / Inspect native windows</button>
+<button id="render-surface-stop" type="button">停止访问 / Stop access</button>
+<pre id="render-surface-status" role="status">未启用 / Not enabled</pre></details></header><main id="media"></main>
+<script src="vendor/hrtc-12.eb3d2838.js"></script><script src="meeting_native_web_watermark.js"></script><script src="meeting_voice_media.js"></script><script src="meeting_offline_media.js"></script><script src="meeting_render_windows.js"></script><script src="meeting_render_surface.js"></script><script src="meeting_offline_view.js"></script></body></html>

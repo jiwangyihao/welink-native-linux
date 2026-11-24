@@ -1,0 +1,9 @@
+{
+  "name": "welink-meeting-management-transport",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "ws": "8.23.0",
+    "https-proxy-agent": "7.0.6"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "welink-native-linux",
+  "version": "45.9.0",
+  "private": true,
+  "license": "MPL-2.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "bootstrap": "python3 NativeBuild/bootstrap.py",
+    "check": "python3 NativeBuild/check_sources.py",
+    "test:smoke": "npm run check && node NativeIntegration/verify_meeting_guest_site.js",
+    "deps:management": "npm ci --prefix Conference/vendor/management --ignore-scripts --no-audit --no-fund --omit=optional"
+  },
+  "devDependencies": {
+    "acorn": "8.15.0"
+  }
+}

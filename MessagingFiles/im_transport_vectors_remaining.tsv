@@ -1,0 +1,27 @@
+103e50	NotifyWrapper	{"description":"","notify":0,"param":{},"serverTime":0,"traceId":""}
+bcad0	OnLineDeviceInfo	{"appId":"","userAccount":""}
+bcb50	OperationAttributeInfo	{"attribute_key":"","end_time":0,"start_time":0,"state":0}
+bcbd0	OprCommandInfo	{"clientSendTime":0,"commandAppId":"","commandContent":"","groupId":0,"userAccount":""}
+bccd0	PushExtData	{}
+bf090	RecentConversationChatInfo	{"appId":"","content":"","msgId":0,"serverSendTime":0,"solidContent":""}
+bf130	RecentConversationInfo	{"baseConversationInfo":{"targetAccount":""},"lastTime":0,"ownerAccount":"","rcId":"","topTime":0}
+bf650	SMSReceiptInfo	{"receiptTime":0,"receiverMobile":"","recordId":0,"senderAccount":""}
+bf6d0	SMSReceiverInfo	{"receiverMobile":""}
+bf7d0	SMSReplyInfo	{"receiverMobile":"","recordId":0,"replyTime":0,"senderAccount":""}
+c0a10	ShareMsgsInfo	{"content":""}
+c0b10	SortOptInfo	{"conversationGroupId":0,"movedType":0,"optTime":0}
+c1450	TenantUnReadCount	{"tenantAccount":"","tenantId":""}
+c14d0	TopConversationInfo	{"rcId":"","rcType":0,"topTime":0}
+c1a50	UnReadChatInfo	{"chatInfos":[]}
+c2930	UserInfoOpr	{"timestamp":0,"userAccount":""}
+c2f90	UserStateInfo	{"userAccount":""}
+c3470	WithdrawChatInfo	{"msgId":0}
+c2a50	UserLogin	{"appId":"1","loginAddr":"127.0.0.1","token":"synthetic-token","userAccount":"oracle-user","clientType":1,"deviceId":"synthetic-device","language":"zh-cn","loginExtData":"{}","deviceName":"","versionNumber":"0.0.0"}
+c2ad0	UserLoginAck	{"description":"","deviceList":[{"loginTime":0}],"lastLoginTime":"0","result":0,"resultDes":"synthetic","rsp":17,"serverTime":123456789,"sno":19,"traceId":"","userAccount":"oracle-user","lastLoginAddr":"127.0.0.1","maaRegionId":"synthetic"}
+bdf50	QueryRecentConversation	{"queryTimestamp":123456789}
+bdfd0	QueryRecentConversationAck	{"description":"","lastSyncTime":123456789,"result":0,"resultDes":"","rsp":0,"serverTime":0,"sno":0,"traceId":"","userAccount":"oracle-user","rcInfos":[{"baseConversationInfo":{"targetAccount":""},"lastTime":0,"ownerAccount":"","rcId":"","topTime":0}],"topRCInfos":[{"rcId":"","rcType":0,"topTime":0}]}
+be510	QueryStateByAccounts	{"userAccounts":["oracle-a","oracle-b"]}
+c3010	UserStateNotify	{"userStateInfos":[{"userAccount":""}]}
+b7160	ChatNotify	{"imChat":{"appId":"","content":"synthetic text"},"receiver":"oracle-b","sender":"oracle-a","chatType":0}
+b7920	CreateGroup	{"enName":"","groupMembers":[],"name":"","groupOptions":{"oracle-key":"1"}}
+ba380	GroupIconInfo	{"groupId":0,"groupIcon":"AAECAw=="}

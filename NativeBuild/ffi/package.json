@@ -1,0 +1,10 @@
+{
+  "name": "welink-linux-ia32-ffi-inputs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned upstream FFI sources for the real Electron 22.3.26 Linux ia32 runtime; not the vendor's private ffi/ref versions",
+  "dependencies": {
+    "ffi-napi": "4.0.3",
+    "ref-napi": "3.0.3"
+  }
+}

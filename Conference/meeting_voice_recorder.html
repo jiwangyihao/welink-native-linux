@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本地声纹录制</title>
+  <style>
+    :root { color-scheme: light dark; font-family: sans-serif; }
+    body { box-sizing: border-box; height: 100vh; margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    h1 { margin: 0; font-size: 1.35rem; }
+    h2 { margin: 0; font-size: 1.1rem; }
+    p { margin: 0; line-height: 1.6; }
+    main { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 14px; }
+    label { display: block; margin-bottom: 6px; }
+    select { box-sizing: border-box; width: 100%; padding: 8px; font: inherit; }
+    #voice-prompt { padding: 16px; border: 1px solid #8888; border-radius: 6px; display: grid; gap: 8px; }
+    #voice-prompt-content { white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+    #voice-prompt-title { overflow-wrap: anywhere; unicode-bidi: plaintext; }
+    #voice-language, #voice-privacy, #voice-consent, #voice-status { font-size: .9rem; }
+    #voice-status { min-height: 3.2em; }
+    #voice-duration { font-variant-numeric: tabular-nums; }
+    footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+    button { font: inherit; padding: 9px 16px; }
+    :focus-visible { outline: 3px solid #3b82f6; outline-offset: 2px; }
+  </style>
+</head>
+<body data-voice-state="loading">
+  <h1>本地声纹录制</h1>
+  <main>
+    <p id="voice-privacy">打开窗口不会启动麦克风。只有同意后点击“开始录制”才会采集声音。Linux 版在本机登记声纹，通话时用这份声纹降低其他人声，不能保证完全消除。撤销同意会删除当前账号的本地声纹。</p>
+    <p id="voice-consent">正在读取同意状态…</p>
+    <p id="voice-anonymous-statement" hidden>匿名声纹声明 / Anonymous voice statement: 仅为本次会议在内存中保存和处理本人声纹，不读取任何已登录账号的声纹，不上传录音或声纹。退出或关闭本次会议、撤销或停用即删除；新会议需要重新同意并录制。此功能只能降低其他人声，不能保证完全隔离。开启此设置不授予麦克风或会议权限。录制期间会议麦克风保持静音。关闭此录制窗口不会撤销保护请求；可使用“停用并删除”恢复普通麦克风选项，但仍需手动取消会议静音。</p>
+    <div>
+      <label for="voice-prompts">朗读文本</label>
+      <select id="voice-prompts" disabled aria-describedby="voice-language"></select>
+    </div>
+    <section id="voice-prompt" aria-label="需要朗读的文本">
+      <h2 id="voice-prompt-title" dir="auto"></h2>
+      <p id="voice-language"></p>
+      <p id="voice-prompt-content" dir="auto">尚未设置朗读文字。</p>
+    </section>
+    <p id="voice-duration" aria-label="实际已采集时长">0.0 / 10.0 秒</p>
+    <p id="voice-status" role="status" aria-live="polite">正在准备本地录制窗口…</p>
+  </main>
+  <footer aria-label="声纹操作">
+    <button id="voice-cancel" type="button">关闭</button>
+    <button id="voice-revoke" type="button" hidden>停用并删除 / Disable and delete</button>
+    <button id="voice-agree" type="button" hidden aria-describedby="voice-anonymous-statement">同意本次会议声明 / Agree for this room</button>
+    <button id="voice-stop" type="button" disabled>停止并提交</button>
+    <button id="voice-record" type="button" disabled aria-describedby="voice-privacy voice-consent">开始录制</button>
+  </footer>
+</body>
+</html>

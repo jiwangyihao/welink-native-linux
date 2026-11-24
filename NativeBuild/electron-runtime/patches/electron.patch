@@ -1,0 +1,30 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 7c1b4b6..a93314c 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -400,6 +400,7 @@ action("electron_generate_node_defines") {
+ 
+ source_set("electron_lib") {
+   configs += [ "//v8:external_startup_data" ]
++  configs += [ "//tools/v8_context_snapshot:use_v8_context_snapshot" ]
+   configs += [ "//third_party/electron_node:node_internals" ]
+ 
+   public_configs = [
+diff --git a/shell/app/node_main.cc b/shell/app/node_main.cc
+index 6b4747e..1ac0e85 100644
+--- a/shell/app/node_main.cc
++++ b/shell/app/node_main.cc
+@@ -184,8 +184,13 @@ int NodeMain(int argc, char* argv[]) {
+     crash_keys::SetPlatformCrashKey();
+ #endif
+ 
++    // Select the snapshot supplied by this build, including non-context builds.
++#if defined(USE_V8_CONTEXT_SNAPSHOT)
+     gin::V8Initializer::LoadV8Snapshot(
+         gin::V8SnapshotFileType::kWithAdditionalContext);
++#else
++    gin::V8Initializer::LoadV8Snapshot(gin::V8SnapshotFileType::kDefault);
++#endif
+ 
+     // V8 requires a task scheduler.
+     base::ThreadPoolInstance::CreateAndStartWithDefaultParams("Electron");
