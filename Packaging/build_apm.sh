@@ -45,7 +45,9 @@ version=${native_version}-apm
 basename=${package}_${version}_amd64.deb
 [[ ! -e $output/$basename && ! -L $output/$basename ]] || fail 'Refusing to overwrite an existing APM release'
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-work=$(mktemp -d "$output/.welink-apm.XXXXXXXX")
+# ace-run-pkg exposes /home, not an arbitrary caller-selected output directory.
+# Keep converter inputs in its mounted home; only the final artifact uses output.
+work=$(mktemp -d "${HOME:?HOME is required by the APM converter}/.welink-apm.XXXXXXXX")
 # The workspace remains private (mktemp creates 0700), but the upstream
 # converter must create Debian control directories with their required 0755.
 umask 022
