@@ -33,6 +33,8 @@ def prepare(prefix, lock_path=LOCK, archives=None):
         raise RuntimeError("Extracted dependency roots must not be symlinks")
     if root.exists() and any(root.iterdir()) and not reuse:
         raise RuntimeError("Unrecorded sysroot: use a fresh prefix")
+    if not reuse and (prefix / "runtime").exists() and any((prefix / "runtime").iterdir()):
+        raise RuntimeError("Unrecorded runtime inputs: use a fresh prefix")
     if reuse:
         if not root.is_dir() or not (prefix / "runtime").is_dir() or not inventory_path.is_file():
             raise RuntimeError("Original dependency inventory or root is missing; use a fresh prefix")
