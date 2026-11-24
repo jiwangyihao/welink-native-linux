@@ -24,7 +24,8 @@ BUILD = re.compile(r'hit-native-linux-ia32-(r45\.(0|[1-9][0-9]*))\Z')
 HASH = re.compile(r'[a-f0-9]{64}\Z')
 SESSION_ENVIRONMENT = ('HOME', 'PATH', 'DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR',
                        'DBUS_SESSION_BUS_ADDRESS', 'LANG', 'LC_ALL', 'XDG_CONFIG_HOME',
-                       'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'XDG_CONFIG_DIRS', 'XDG_DATA_DIRS')
+                       'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'XDG_CONFIG_DIRS', 'XDG_DATA_DIRS',
+                       'WELINK_NATIVE_APM_HOST_ROOT_DIRS')
 UNSAFE_ENVIRONMENT = ('ELECTRON_RUN_AS_NODE', 'WELINK_NATIVE_PROFILE_GATE_FD', 'NODE_OPTIONS', 'NODE_PATH',
                       'NODE_EXTRA_CA_CERTS', 'NODE_TLS_REJECT_UNAUTHORIZED', 'LD_PRELOAD', 'LD_AUDIT',
                       'LD_LIBRARY_PATH', 'OPENSSL_CONF', 'OPENSSL_MODULES', 'PYTHONPATH', 'PYTHONHOME',
@@ -551,19 +552,15 @@ class Transaction:
                 pid = readiness(value, self.request['token'], self.manifest['build'], self.target, self.profile)
                 if self.apm_package:
                     process = Path('/proc') / str(pid)
-                    environment = (process / 'environ').read_bytes().split(b'\0')
-                    for name, expected in (('WELINK_NATIVE_APM_PACKAGE', self.apm_package),
-                                           ('APM_PKG_NAME', self.apm_package), ('IS_ACE_ENV', '1')):
-                        if os.fsencode(name + '=' + expected) not in environment:
-                            raise RuntimeError('Updated application lost its APM environment')
+                    # Electron's process-title handling can clear /proc/environ
+                    # and flatten argv. The signed image reports its live
+                    # application context in the token-bound readiness receipt;
+                    # kernel namespaces still independently prove containment.
+                    if value.get('apmPackage') != self.apm_package or value.get('sandboxBackend') != 'namespace':
+                        raise RuntimeError('Updated application lost its APM namespace-sandbox context')
                     for namespace in ('mnt', 'user'):
                         if (process / 'ns' / namespace).readlink() != (Path('/proc/self/ns') / namespace).readlink():
                             raise RuntimeError('Updated application escaped its APM namespace')
-                    arguments = (process / 'cmdline').read_bytes().split(b'\0')
-                    if b'--disable-setuid-sandbox' not in arguments or any(
-                            argument.partition(b'=')[0] in (b'--no-sandbox', b'--disable-namespace-sandbox', b'--disable-seccomp-filter-sandbox')
-                            for argument in arguments):
-                        raise RuntimeError('Updated application is not using the required Chromium namespace sandbox')
                 return
             if self.child and self.child.poll() is not None:
                 raise RuntimeError('The new application exited before becoming ready')

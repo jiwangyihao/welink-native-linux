@@ -269,6 +269,7 @@ class Lifecycle(unittest.TestCase):
             'LANG': 'zh_CN.UTF-8', 'LC_ALL': 'C.UTF-8', 'XDG_CONFIG_HOME': str(self.root / 'config'),
             'XDG_DATA_HOME': str(self.root / 'data'), 'XDG_CACHE_HOME': str(self.root / 'cache'),
             'XDG_STATE_HOME': str(self.root / 'state'), 'XDG_CONFIG_DIRS': '/session/config:/etc/xdg',
+            'WELINK_NATIVE_APM_HOST_ROOT_DIRS': json.dumps([{'path': '/home', 'dev': '1', 'ino': '2', 'mode': 0o755, 'ctimeNs': '3'}]),
             'XDG_DATA_DIRS': '/session/data:/usr/share', 'NODE_OPTIONS': '--require=/untrusted',
             'LD_PRELOAD': '/untrusted.so', 'OPENSSL_CONF': '/untrusted.cnf', 'PYTHONPATH': '/untrusted',
             'WELINK_NATIVE_PROFILE_GATE_FD': '999', 'WELINK_NATIVE_UPDATE_DIR': '/stale',

@@ -2,8 +2,180 @@
 # Amber PM entry point. Keep the overlay mounted until the app AND any detached
 # updater/restarted descendants exit. Never hand the app to host systemd.
 set -euo pipefail
-if [[ ${IS_ACE_ENV:-} != 1 || ${APM_PKG_NAME:-} != cn.edu.hit.welink.native.apm ]]; then
-    printf '%s\n' 'Run this launcher through: apm run cn.edu.hit.welink.native.apm /opt/apps/cn.edu.hit.welink.native/files/bin/launch' >&2
+if [[ ${IS_ACE_ENV:-} != 1 ]]; then
+    # Keep installed APM layers read-only; upstream `apm run` incorrectly uses
+    # root-owned package directories as writable upper/work layers.
+    exec /usr/bin/python3 -I - "${BASH_SOURCE[0]}" "$@" <<'APM_HOST'
+import errno
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import socket
+import stat
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+
+package = 'cn.edu.hit.welink.native.apm'
+if os.getuid() == 0:
+    raise SystemExit('Launch WeLink APM as the desktop user, not root')
+script = Path(sys.argv[1]).resolve(strict=True)
+package_root = script.parent.parent
+if script.name != 'launch' or script.parent.name != 'files' or package_root.name != package:
+    raise SystemExit('The APM host launcher must come from the installed package')
+for item in (script, package_root, package_root / 'files/core'):
+    info = item.stat()
+    if info.st_uid != 0 or info.st_mode & 0o022:
+        raise SystemExit('Installed APM executable layers must remain root-owned and non-writable')
+home = Path.home().absolute()
+if home.resolve() != home or home.stat().st_uid != os.getuid():
+    raise SystemExit('HOME must be canonical and owned by the desktop user')
+# Bubblewrap leaves host root unmapped. Capture only actual root-owned HOME
+# ancestors while still on the host; never treat every overflow UID as root.
+# Walk held directory descriptors so a symlink cannot substitute an ancestor.
+host_root_directories = []
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+directory = os.open('/', directory_flags)
+walked = Path('/')
+try:
+    for component in ('', *home.parts[1:]):
+        if component:
+            child = os.open(component, directory_flags, dir_fd=directory)
+            os.close(directory)
+            directory = child
+            walked /= component
+        info = os.fstat(directory)
+        mode = stat.S_IMODE(info.st_mode)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_nlink < 1 or info.st_uid not in (0, os.getuid()) or
+                (mode & 0o022 and not (info.st_uid == 0 and mode & 0o1000))):
+            raise SystemExit('Untrusted writable or foreign-owned HOME ancestor: ' + str(walked))
+        if info.st_uid == 0:
+            host_root_directories.append({'path': str(walked), 'dev': str(info.st_dev),
+                                          'ino': str(info.st_ino), 'mode': mode, 'ctimeNs': str(info.st_ctime_ns)})
+finally:
+    os.close(directory)
+# ace-run builds bind arguments as shell text. Reject unsupported HOME syntax
+# instead of allowing it to split or reinterpret the mount paths.
+if not re.fullmatch(r'[A-Za-z0-9_./@%+=-]+', str(home)):
+    raise SystemExit('The installed APM runtime does not safely support this HOME pathname')
+state = home / '.local/state/welink-native-apm'
+state.mkdir(parents=True, mode=0o700, exist_ok=True)
+info = state.stat()
+if state.resolve() != state or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+    raise SystemExit('The APM launch state directory must be canonical, user-owned and mode 0700')
+payload = json.dumps(sys.argv[2:]).encode() + b'\n'
+if len(payload) > 65536:
+    raise SystemExit('APM activation arguments are too large')
+
+def activate():
+    filename = state / 'launch.sock'
+    try:
+        info = filename.lstat()
+        if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+            raise RuntimeError('Refusing an unrelated APM activation socket')
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(10)
+            connection.connect(str(filename))
+            _, uid, _ = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+            if uid != os.getuid():
+                raise RuntimeError('The APM activation server belongs to another user')
+            connection.sendall(payload)
+            data = b''
+            while b'\n' not in data and len(data) <= 4096:
+                chunk = connection.recv(4096)
+                if not chunk:
+                    raise RuntimeError('The APM activation server closed without acknowledging the request')
+                data += chunk
+            if len(data) > 4096:
+                raise RuntimeError('Invalid APM activation reply')
+            reply = json.loads(data)
+            if not isinstance(reply, dict) or reply.get('ok') is not True:
+                raise RuntimeError(reply.get('error', 'APM activation failed') if isinstance(reply, dict) else 'Invalid APM activation reply')
+            return True
+    except OSError as error:
+        if error.errno not in (errno.ENOENT, errno.ECONNREFUSED):
+            raise
+        return False
+
+if activate():
+    raise SystemExit(0)
+lock = os.open(state / 'mount.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+info = os.fstat(lock)
+if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+    raise SystemExit('Invalid APM mount lock')
+try:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    for _ in range(100):
+        if activate():
+            raise SystemExit(0)
+        time.sleep(0.1)
+    raise SystemExit('The APM package is still starting or shutting down')
+if activate():
+    raise SystemExit(0)
+
+layers = []
+seen = set()
+def layer(name):
+    if not re.fullmatch(r'[a-z0-9][a-z0-9+.-]+', name):
+        raise RuntimeError('Invalid declared APM base name')
+    if name in seen:
+        return
+    seen.add(name)
+    directory = package_root if name == package else package_root.parent / name
+    if not directory.is_dir():
+        raise RuntimeError('Install the declared APM base first: ' + name)
+    content = directory / 'files/ace-env'
+    if not content.is_dir():
+        content = directory / 'files/core'
+    if not content.is_dir() or content.stat().st_uid != 0 or content.stat().st_mode & 0o022:
+        raise RuntimeError('The declared APM layer must be an installed, protected directory: ' + name)
+    layers.append(str(content.resolve()))
+    info = directory / 'info'
+    if info.is_file():
+        for base in info.read_text().splitlines():
+            if base.strip():
+                layer(base.strip())
+
+layer(package)
+runtime = Path('/var/lib/apm/apm/files/ace-run')
+if len(layers) < 2 or not runtime.is_file():
+    raise SystemExit('The APM runtime and declared base layers must be installed')
+workspace = Path(tempfile.mkdtemp(prefix='mount-', dir=state))
+merged = workspace / 'root'
+for name in ('upper', 'work', 'root'):
+    (workspace / name).mkdir(mode=0o700)
+arguments = workspace / 'arguments.json'
+with arguments.open('xb') as stream:
+    os.fchmod(stream.fileno(), 0o600)
+    stream.write(payload)
+environment = dict(os.environ, APM_PKG_NAME=package, chrootEnvPath=str(merged),
+                   WELINK_NATIVE_APM_ARGUMENTS_FILE=str(arguments),
+                   WELINK_NATIVE_APM_HOST_ROOT_DIRS=json.dumps(host_root_directories, separators=(',', ':')))
+environment.pop('APM_USE_SANDBOX', None)
+try:
+    options = 'lowerdir=' + ':'.join(layers) + ',upperdir=' + str(workspace / 'upper') + ',workdir=' + str(workspace / 'work')
+    subprocess.run(['/usr/bin/fuse-overlayfs', '-o', options, str(merged)], check=True)
+    if not os.path.ismount(merged):
+        raise RuntimeError('The private APM overlay was not mounted')
+    # User arguments cross ace-run's shell interpolation in a private JSON
+    # file; the executable command is always this fixed package entry point.
+    result = subprocess.run([str(runtime), '/opt/apps/cn.edu.hit.welink.native/files/bin/launch'], env=environment)
+finally:
+    if os.path.ismount(merged):
+        subprocess.run(['/usr/bin/fusermount3', '-u', str(merged)], check=True)
+    shutil.rmtree(workspace)
+    os.close(lock)
+raise SystemExit(result.returncode)
+APM_HOST
+fi
+if [[ ${APM_PKG_NAME:-} != cn.edu.hit.welink.native.apm ]]; then
+    printf '%s\n' 'The WeLink APM launcher cannot run inside a different APM package.' >&2
     exit 1
 fi
 export WELINK_NATIVE_APM_PACKAGE=cn.edu.hit.welink.native.apm
@@ -22,6 +194,17 @@ import stat
 import struct
 import sys
 import time
+arguments = sys.argv[1:]
+arguments_file = os.environ.pop('WELINK_NATIVE_APM_ARGUMENTS_FILE', None)
+if arguments_file:
+    fd = os.open(arguments_file, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or info.st_size > 65536:
+            raise SystemExit('Invalid private APM launch arguments')
+        arguments = json.load(stream)
+    if not isinstance(arguments, list) or any(not isinstance(arg, str) or '\0' in arg for arg in arguments):
+        raise SystemExit('Invalid APM launch arguments')
 
 if os.getuid() == 0:
     raise SystemExit('Launch WeLink APM as the desktop user, not root')
@@ -46,7 +229,7 @@ except BlockingIOError:
         signal.signal(number, signal.SIG_IGN)
     result = 0
     try:
-        payload = json.dumps(sys.argv[1:]).encode() + b'\n'
+        payload = json.dumps(arguments).encode() + b'\n'
         if len(payload) > 65536:
             raise ValueError('APM activation arguments are too large')
         deadline = time.monotonic() + 10
@@ -117,7 +300,7 @@ def forward_signal(number, _frame):
 for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
     signal.signal(number, forward_signal)
 
-command = ['/usr/bin/python3', '-I', '/opt/apps/cn.edu.hit.welink.native/files/package_install.py', *sys.argv[1:]]
+command = ['/usr/bin/python3', '-I', '/opt/apps/cn.edu.hit.welink.native/files/package_install.py', *arguments]
 initial = os.posix_spawn(command[0], command, os.environ)
 exit_code = 0
 try:

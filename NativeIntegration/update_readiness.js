@@ -52,8 +52,14 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
   const build = JSON.parse(fs.readFileSync(path.join(appRoot, 'native/build.json'), 'utf8')).build;
   let running = false, disposed = false, sent = false, stable = 0, previous = '', stopping = false;
   function receipt(value) {
+    const commandLine = electron.app.commandLine;
+    const disabled = ['no-sandbox', 'disable-namespace-sandbox', 'disable-seccomp-filter-sandbox']
+      .some(name => commandLine.hasSwitch(name));
+    const sandboxBackend = disabled ? 'disabled' : commandLine.hasSwitch('disable-setuid-sandbox') ? 'namespace' : 'default';
+    const apmPackage = process.env.WELINK_NATIVE_APM_PACKAGE || null;
     const temporary = path.join(directory, 'readiness-' + process.pid + '.tmp');
-    fs.writeFileSync(temporary, JSON.stringify({ ...value, token, build, profile: profileRoot, pid: process.pid, startTime: processStart(process.pid) }), { flag: 'wx', mode: 0o600 });
+    fs.writeFileSync(temporary, JSON.stringify({ ...value, token, build, profile: profileRoot, pid: process.pid,
+      startTime: processStart(process.pid), apmPackage, sandboxBackend }), { flag: 'wx', mode: 0o600 });
     fs.renameSync(temporary, path.join(directory, 'readiness.json'));
     sent = true;
   }

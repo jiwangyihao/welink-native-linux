@@ -46,6 +46,9 @@ basename=${package}_${version}_amd64.deb
 [[ ! -e $output/$basename && ! -L $output/$basename ]] || fail 'Refusing to overwrite an existing APM release'
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 work=$(mktemp -d "$output/.welink-apm.XXXXXXXX")
+# The workspace remains private (mktemp creates 0700), but the upstream
+# converter must create Debian control directories with their required 0755.
+umask 022
 trap 'rm -rf -- "$work"' EXIT
 mkdir "$work/input" "$work/converted" "$work/final"
 dpkg-deb --raw-extract "$deb" "$work/input"
@@ -146,6 +149,20 @@ if ('Exec=apm run ' + package + ' /opt/apps/cn.edu.hit.welink.native/files/bin/l
     raise SystemExit('The real converter did not create the expected APM desktop dispatch')
 if list((layer / 'entries/applications').glob('cn.edu.hit.welink.native.desktop')):
     raise SystemExit('The APM package must not export the host native desktop identity')
+# Export a host entry point which mounts only private writable layers and uses
+# APM's installed ace-run. The converter's package/base layers stay root-owned.
+host_launcher = '/var/lib/apm/apm/files/ace-env/var/lib/apm/' + package + '/files/launch'
+shutil.copyfile(original / app_path / 'bin/launch', layer / 'files/launch')
+(layer / 'files/launch').chmod(0o755)
+entry.write_text('\n'.join('Exec=/bin/bash -- ' + host_launcher + ' %u' if line.startswith('Exec=') else line
+                          for line in lines) + '\nTryExec=' + host_launcher + '\n')
+for relative in (Path('usr/share/applications') / (package + '.desktop'),
+                 Path('opt/apps/cn.edu.hit.welink.native/entries/applications') / (package + '.desktop')):
+    internal = core / relative
+    if internal.is_symlink() or not internal.is_file():
+        raise SystemExit('Missing converted internal APM desktop entry')
+    internal.write_text('\n'.join('Exec=/opt/apps/cn.edu.hit.welink.native/files/bin/launch %u' if line.startswith('Exec=') else line
+                                 for line in internal.read_text().splitlines()) + '\n')
 # Check payload bytes against the prepared source, and restore its file modes:
 # upstream converter blanket-chmods everything to 0755. APM chrome-sandbox is
 # deliberately non-setuid; Chromium uses its nested namespace/seccomp backend.

@@ -76,14 +76,48 @@ function release(active) {
   return file && directory;
 }
 
-function checkDirectory(stat, final) {
+function hostRootAncestor(stat, fd) {
+  const packageName = 'cn.edu.hit.welink.native.apm';
+  if (process.env.WELINK_NATIVE_APM_PACKAGE !== packageName || process.env.APM_PKG_NAME !== packageName ||
+      process.env.IS_ACE_ENV !== '1' || !Number.isInteger(fd)) return false;
+  try {
+    const overflow = Number(fs.readFileSync('/proc/sys/kernel/overflowuid', 'utf8').trim());
+    if (!Number.isInteger(overflow) || overflow <= 0 || UID === overflow || stat.uid !== overflow) return false;
+    const mappings = fs.readFileSync('/proc/self/uid_map', 'utf8').trim().split('\n').map(line => line.trim().split(/\s+/).map(Number));
+    if (!mappings.length || mappings.some(row => row.length !== 3 || row.some(value => !Number.isSafeInteger(value) || value < 0) || row[1] === 0 || row[2] === 0)) return false;
+    const supervisor = process.env.WELINK_NATIVE_APM_SUPERVISOR_PID || '';
+    if (!/^[1-9][0-9]*$/.test(supervisor)) return false;
+    for (const namespace of ['mnt', 'user']) {
+      if (fs.readlinkSync(`/proc/${supervisor}/ns/${namespace}`) !== fs.readlinkSync(`/proc/self/ns/${namespace}`)) return false;
+    }
+    const encoded = process.env.WELINK_NATIVE_APM_HOST_ROOT_DIRS || '';
+    if (!encoded || Buffer.byteLength(encoded) > 32768) return false;
+    const facts = JSON.parse(encoded);
+    if (!Array.isArray(facts) || !facts.length || facts.length > 64 || facts.some(item => !item || typeof item !== 'object' ||
+        Object.keys(item).sort().join(',') !== 'ctimeNs,dev,ino,mode,path' || typeof item.path !== 'string' ||
+        !path.isAbsolute(item.path) || path.normalize(item.path) !== item.path ||
+        !Number.isInteger(item.mode) || item.mode < 0 || item.mode > 0o7777 ||
+        ['dev', 'ino', 'ctimeNs'].some(key => typeof item[key] !== 'string' || !/^[0-9]{1,30}$/.test(item[key])))) return false;
+    const home = process.env.HOME;
+    if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) return false;
+    const directory = fs.readlinkSync(`/proc/self/fd/${fd}`);
+    if (directory !== '/' && home !== directory && !home.startsWith(directory + '/')) return false;
+    const exact = fs.fstatSync(fd, { bigint: true });
+    return facts.some(item => item.path === directory && item.dev === String(exact.dev) && item.ino === String(exact.ino) &&
+      item.mode === Number(exact.mode & 0o7777n) && item.ctimeNs === String(exact.ctimeNs));
+  } catch (_) { return false; }
+}
+
+function checkDirectory(stat, final, fd) {
   if (!stat.isDirectory() || stat.nlink < 1) reject('SDK_LOG_UNSAFE_DIRECTORY');
   if (final) {
     if (stat.uid !== UID || (stat.mode & 0o7777) !== 0o700) reject('SDK_LOG_UNSAFE_DIRECTORY');
-  } else if ((stat.uid !== UID && stat.uid !== 0) ||
-      ((stat.mode & 0o022) !== 0 && !(stat.uid === 0 && (stat.mode & 0o1000) !== 0))) {
-    // Root-owned sticky /tmp is allowed. Untrusted writable ancestors are not.
-    reject('SDK_LOG_UNSAFE_DIRECTORY');
+  } else {
+    const rootOwned = stat.uid === 0 || hostRootAncestor(stat, fd);
+    if ((stat.uid !== UID && !rootOwned) || ((stat.mode & 0o022) !== 0 && !(rootOwned && (stat.mode & 0o1000) !== 0))) {
+      // Only actual root-owned sticky ancestors, including host-validated namespace identities, are allowed.
+      reject('SDK_LOG_UNSAFE_DIRECTORY');
+    }
   }
 }
 
@@ -103,7 +137,7 @@ function openDirectory(directory) {
   try {
     fd = fs.openSync('/', DIRECTORY_FLAGS);
     for (let index = 0; index < parts.length; ++index) {
-      checkDirectory(fs.fstatSync(fd), false);
+      checkDirectory(fs.fstatSync(fd), false, fd);
       const name = relativeTo(fd, parts[index]);
       let child;
       try { child = fs.openSync(name, DIRECTORY_FLAGS); }

@@ -102,8 +102,15 @@ except BlockingIOError:
         time.sleep(0.1)
     raise SystemExit('The APM package is still starting or shutting down; try again once it is ready')
 if not activate():
-    result = subprocess.run(['/usr/bin/apm', 'run', 'cn.edu.hit.welink.native.apm',
-                             '/opt/apps/cn.edu.hit.welink.native/files/bin/launch', *sys.argv[1:]])
+    candidates = ('/var/lib/apm/apm/files/ace-env/var/lib/apm/cn.edu.hit.welink.native.apm/files/launch',
+                  '/var/lib/apm/cn.edu.hit.welink.native.apm/files/launch')
+    host_launcher = next((candidate for candidate in candidates if os.path.isfile(candidate)), None)
+    if host_launcher is None:
+        raise SystemExit('The installed APM host launcher is missing')
+    info = os.lstat(host_launcher)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        raise SystemExit('The APM host launcher must be a protected root-owned package file')
+    result = subprocess.run(['/bin/bash', '--', host_launcher, *sys.argv[1:]])
     raise SystemExit(result.returncode)
 APM_DISPATCH
 fi'''
@@ -126,9 +133,14 @@ def launcher_text(image, profile, direct_launch=False, apm_package=None):
     # Only releases beside this image may replace it for singleton activation.
     # The lock is scoped to this profile, host and uid, not just a window title.
     release_root = image.parent.parent
-    dispatch = ('exec "$image/launch-welink" "$@"' if direct_launch or apm_package else
-                'exec systemd-run --user --quiet --collect --property=Type=exec --working-directory="$HOME" \\\n'
-                '    --setenv="WELINK_NATIVE_PROFILE_DIR=$WELINK_NATIVE_PROFILE_DIR" -- "$image/launch-welink" "$@"')
+    dispatch = ('exec "$image/launch-welink" "$@"' if direct_launch or apm_package else "\n".join((
+        'session=()',
+        'for name in HOME PATH DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS LANG LC_ALL XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_CONFIG_DIRS XDG_DATA_DIRS; do',
+        '    if [[ -v $name ]]; then session+=(--setenv="$name=${!name}"); fi',
+        'done',
+        'exec systemd-run --user --quiet --collect --property=Type=exec --working-directory="$HOME" "${session[@]}" \\',
+        '    --setenv="WELINK_NATIVE_PROFILE_DIR=$WELINK_NATIVE_PROFILE_DIR" -- "$image/launch-welink" "$@"',
+    )))
     context = (() if not apm_package else (
         "export WELINK_NATIVE_APM_PACKAGE=" + shlex.quote(apm_package),
         APM_DISPATCH,

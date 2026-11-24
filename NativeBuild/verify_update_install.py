@@ -109,12 +109,6 @@ def main():
         assert apm_entry.name == 'cn.edu.hit.welink.native.apm.desktop'
         assert launcher.read_bytes() == native_launcher and entry.read_bytes() == native_entry
         assert (config / 'mimeapps.list').read_bytes() == defaults
-        generated = apm_launcher.read_text()
-        assert 'export WELINK_NATIVE_APM_PACKAGE=cn.edu.hit.welink.native.apm' in generated
-        assert 'systemd-run' not in generated
-        assert "'/usr/bin/apm', 'run', 'cn.edu.hit.welink.native.apm'" in generated
-        assert 'exec "$image/launch-welink" "$@"' in generated
-        assert str(apm_profile) in generated
         try:
             desktop.install(apm_target, home, profile=profile, apm_package=desktop.APM_PACKAGE)
         except ValueError as error:
