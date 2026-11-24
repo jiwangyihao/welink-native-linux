@@ -286,7 +286,7 @@ def readiness(value, token, build, image, profile):
     if value.get('status') == 'failed':
         raise RuntimeError('New application startup failed: ' + str(value.get('error', 'unknown startup failure')))
     route = value.get('route', '')
-    if value.get('status') != 'ready' or route not in ('/login/Auth2Login/Webview', '/login/LoginPage', '/login/WPFirstTimeAuthentication/empty', '/main/im') or value.get('mounted') is not True or value.get('httpExports') != ['middleGroundAjax', 'middleGroundPost', 'downloadUpgradeFile', 'cancelDownloadUpgradeFile']:
+    if value.get('status') != 'ready' or route not in ('/login', '/login/Auth2Login/Webview', '/login/LoginPage', '/login/WPFirstTimeAuthentication/empty', '/main/im') or value.get('mounted') is not True or value.get('httpExports') != ['middleGroundAjax', 'middleGroundPost', 'downloadUpgradeFile', 'cancelDownloadUpgradeFile']:
         raise RuntimeError('The new application has not reached a working login/message route')
     return pid
 
