@@ -19,9 +19,10 @@ from acquire import digest, download
 ROOT = Path(__file__).resolve().parent
 
 
-def prepare(prefix, lock_path):
+def prepare(prefix, lock_path, archives=None):
     prefix = prefix.resolve()
     prefix.mkdir(parents=True, exist_ok=True)
+    archives = archives.resolve() if archives else prefix / "archives"
     lock = json.loads(lock_path.read_text())
     if lock["architecture"] != "i386" or not lock["packages"]:
         raise RuntimeError("Expected a nonempty pinned i386 runtime package set")
@@ -46,7 +47,7 @@ def prepare(prefix, lock_path):
         root.mkdir(exist_ok=True)
     for name, record in lock["packages"].items():
         filename = Path(urllib.parse.urlparse(record["url"]).path).name
-        archive = download(record["url"], prefix / "archives" / filename, record["sha256"])
+        archive = download(record["url"], archives / filename, record["sha256"])
         control = subprocess.check_output(["dpkg-deb", "--field", str(archive)], text=True)
         fields = dict(line.split(": ", 1) for line in control.splitlines()
                       if ": " in line and not line[0].isspace())
@@ -79,5 +80,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, required=True, help="new isolated runtime cache")
     parser.add_argument("--lock", type=Path, default=ROOT / "packages.lock.json")
+    parser.add_argument("--archives", type=Path, help="hash-verified package cache separate from extracted inputs")
     args = parser.parse_args()
-    prepare(args.prefix, args.lock)
+    prepare(args.prefix, args.lock, args.archives)

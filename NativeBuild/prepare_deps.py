@@ -7,13 +7,13 @@ import re
 import subprocess
 import tarfile
 
-from acquire import digest, download
+from acquire import digest, download, tree_inventory
 
 
 LOCK = Path(__file__).with_name("dependencies.lock.json")
 
 
-def prepare(prefix, lock_path=LOCK, archives=None, reuse_extracted=False):
+def prepare(prefix, lock_path=LOCK, archives=None):
     prefix = prefix.resolve()
     prefix.mkdir(parents=True, exist_ok=True)
     lock = json.loads(lock_path.read_text())
@@ -24,14 +24,22 @@ def prepare(prefix, lock_path=LOCK, archives=None, reuse_extracted=False):
     archives.mkdir(parents=True, exist_ok=True)
     root = prefix / "sysroot"
     stamp = prefix / ".extracted-lock.sha256"
+    inventory_path = prefix / "installed-files.json"
     lock_hash = digest(lock_path).hexdigest()
     if stamp.exists() and stamp.read_text().strip() != lock_hash:
         raise RuntimeError("Dependency lock changed; select a fresh prefix")
-    reuse = stamp.exists() or reuse_extracted
+    reuse = stamp.exists()
+    if root.is_symlink() or (prefix / "runtime").is_symlink():
+        raise RuntimeError("Extracted dependency roots must not be symlinks")
     if root.exists() and any(root.iterdir()) and not reuse:
-        raise RuntimeError("Unrecorded sysroot: use a fresh prefix or explicit --reuse-extracted")
-    if reuse and not (root / "usr/include").is_dir():
-        raise RuntimeError("Cannot reuse a missing development sysroot")
+        raise RuntimeError("Unrecorded sysroot: use a fresh prefix")
+    if reuse:
+        if not root.is_dir() or not (prefix / "runtime").is_dir() or not inventory_path.is_file():
+            raise RuntimeError("Original dependency inventory or root is missing; use a fresh prefix")
+        original = json.loads(inventory_path.read_text())
+        current = {"sysroot": tree_inventory(root), "runtime": tree_inventory(prefix / "runtime")}
+        if current != original:
+            raise RuntimeError("Dependency files or symlinks differ from the original inventory; use a fresh prefix")
     root.mkdir(exist_ok=True)
     library_root = root / "lib"
     if not library_root.exists() and not library_root.is_symlink():
@@ -103,6 +111,9 @@ def prepare(prefix, lock_path=LOCK, archives=None, reuse_extracted=False):
         if len(remaining) == len(aliases):
             raise RuntimeError(f"Unresolved runtime aliases: {remaining}")
         aliases = remaining
+    if not reuse:
+        installed = {"sysroot": tree_inventory(root), "runtime": tree_inventory(runtime)}
+        inventory_path.write_text(json.dumps(installed, sort_keys=True, indent=2) + "\n")
     (prefix / "packages.lock.json").write_text(lock_path.read_text())
     stamp.write_text(lock_hash + "\n")
     print(json.dumps({"sysroot": str(root), "runtime": str(runtime), "packages": len(selected)}))
@@ -113,6 +124,5 @@ if __name__ == "__main__":
     parser.add_argument("prefix", type=Path, help="new isolated dependency prefix")
     parser.add_argument("--lock", type=Path, default=LOCK)
     parser.add_argument("--archives", type=Path, help="optional existing archive cache (hashes are always checked)")
-    parser.add_argument("--reuse-extracted", action="store_true", help="explicitly trust an already extracted matching sysroot")
     args = parser.parse_args()
-    prepare(args.prefix, args.lock, args.archives, args.reuse_extracted)
+    prepare(args.prefix, args.lock, args.archives)

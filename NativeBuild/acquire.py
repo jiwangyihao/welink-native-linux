@@ -5,8 +5,10 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
+import stat
 import tarfile
 import tempfile
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -28,6 +30,13 @@ def verify(path, expected):
         raise RuntimeError(f"Integrity mismatch: {path}; expected {expected}, got {actual}")
 
 
+class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, newurl):
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            raise RuntimeError(f"Refusing insecure download redirect: {newurl}")
+        return super().redirect_request(request, response, code, message, headers, newurl)
+
+
 def download(url, path, expected):
     path = Path(path)
     if not url.startswith("https://"):
@@ -40,7 +49,7 @@ def download(url, path, expected):
         temporary = Path(target.name)
         try:
             request = urllib.request.Request(url, headers={"User-Agent": "welink-native-linux-source-bootstrap/1"})
-            with urllib.request.urlopen(request, timeout=120) as response:
+            with urllib.request.build_opener(HTTPSRedirectHandler()).open(request, timeout=120) as response:
                 if not response.url.startswith("https://"):
                     raise RuntimeError(f"Insecure download redirect: {response.url}")
                 shutil.copyfileobj(response, target)
@@ -87,15 +96,50 @@ def extract(archive, output, root_name=None):
             selected.rename(output)
 
 
-def materialize(archive, output, expected, root_name=None):
-    """Reuse only our recorded extraction of the same verified archive."""
+def tree_inventory(root, ignore=()):
+    """Content, link targets and executable bits; never follow input symlinks."""
+    inventory = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if relative in ignore:
+            continue
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            inventory[relative] = {"symlink": str(path.readlink())}
+        elif stat.S_ISREG(mode):
+            inventory[relative] = {"sha256": digest(path).hexdigest(), "executable": bool(mode & 0o111)}
+        elif stat.S_ISDIR(mode):
+            inventory[relative] = {"directory": True}
+        else:
+            raise RuntimeError(f"Unsupported extracted file type: {path}")
+    return inventory
+
+
+def materialize(archive, output, expected, root_name=None, generated=None):
+    """Fresh extraction, or full comparison against a fresh verified extraction."""
     verify(archive, expected)
     output = Path(output)
+    if output.is_symlink():
+        raise RuntimeError(f"Refusing linked extracted input: {output}")
     marker = output / ".source-archive.sha256"
     archive_hash = digest(archive).hexdigest()
+
+    def populate(destination):
+        extract(archive, destination, root_name)
+        for name, value in (generated or {}).items():
+            (destination / name).write_text(value)
+
     if output.exists():
-        if not marker.is_file() or marker.read_text().strip() != archive_hash:
-            raise RuntimeError(f"Unrecorded or changed extraction: {output}; use a fresh directory")
+        if not output.is_dir():
+            raise RuntimeError(f"Extracted input is not a directory: {output}")
+        if marker.exists() and (marker.is_symlink() or marker.read_text().strip() != archive_hash):
+            raise RuntimeError(f"Changed extraction marker: {output}; use a fresh directory")
+        with tempfile.TemporaryDirectory(dir=output.parent, prefix=".verify-source-") as temporary:
+            reference = Path(temporary) / "reference"
+            populate(reference)
+            if tree_inventory(output, (marker.name,)) != tree_inventory(reference):
+                raise RuntimeError(f"Extracted files differ from the pinned archive: {output}; use a fresh directory")
+        print(f"Verified entire extracted source against pinned archive: {output}", flush=True)
         return
-    extract(archive, output, root_name)
+    populate(output)
     marker.write_text(archive_hash + "\n")

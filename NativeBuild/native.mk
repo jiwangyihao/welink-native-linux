@@ -16,7 +16,7 @@ PKG_ENV := PKG_CONFIG_LIBDIR=$(SYSROOT)/usr/lib/i386-linux-gnu/pkgconfig:$(SYSRO
 PKG = env $(PKG_ENV) pkg-config
 OBJ := $(OUTPUT)/.objects
 JSON_LIB := $(JSON_PREFIX)/lib/libjson-c.a
-CPPFLAGS := -I$(SDK_ROOT) -I$(SDK_ROOT)/LoginSecurity -I$(SDK_ROOT)/MessagingFiles -I$(SDK_ROOT)/Conference -I$(SDK_ROOT)/NativeIntegration -I$(JSON_PREFIX)/include -I$(abspath $(SQLITE_SOURCE)/../..)
+CPPFLAGS := -I$(SQLITE_SOURCE) -I$(SDK_ROOT) -I$(SDK_ROOT)/LoginSecurity -I$(SDK_ROOT)/MessagingFiles -I$(SDK_ROOT)/Conference -I$(SDK_ROOT)/NativeIntegration -I$(JSON_PREFIX)/include
 CFLAGS := --target=i686-linux-gnu --sysroot=$(SYSROOT) --gcc-toolchain=$(SYSROOT)/usr -std=gnu11 -O2 -fPIC -fvisibility=hidden -Wall -Wextra -pthread
 LDFLAGS := --target=i686-linux-gnu --sysroot=$(SYSROOT) --gcc-toolchain=$(SYSROOT)/usr -shared -pthread -Wl,-z,defs -Wl,--exclude-libs,ALL -Wl,-rpath,'$$ORIGIN/runtime'
 TARGETS := common_utils.dll.so conference_db.dll.so http_with_rs.dll.so sqlite_plugin.dll.so contact_sqlite_plugin.dll.so wk_login.dll.so wk_security.dll.so wk_tup_support.dll.so meeting_adapter.dll.so tup_im_logic_api.so tup_offlinefile_logic_api.so tup_nativetools_logic_api.so tup_sqlite_logic_api.so db_import_export_tools.so welink-import-export-worker welink-voice-worker

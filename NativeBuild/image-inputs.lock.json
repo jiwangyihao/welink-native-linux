@@ -1,0 +1,56 @@
+{
+  "formatVersion": 1,
+  "vendor": {
+    "product": "HIT APP",
+    "version": "7.47.6.95",
+    "packageVersion": "7.47.6",
+    "archive": "HIT_APP_Win_custom_202412060307_3848_7_47_6_95.exe",
+    "url": "https://cdn02.welink.huaweicloud.com/appstore/file/web/free/down/042c58f954f04f60aa7cc242e2a1e33a/HIT%20APP_Win_custom_202412060307_3848_7_47_6_95.exe",
+    "sha256": "5e90fc8822af697a50617daab233a42aedc98787c9564f9dbe05b782072f9c10",
+    "size": 301766336,
+    "format": "inno-setup",
+    "appPath": "app/resources/app",
+    "provenance": {
+      "publisherPage": "https://app.hit.edu.cn/",
+      "selection": "Desktop Windows download link; the page label can differ from the actual pinned installer version.",
+      "rights": "Proprietary HIT/Huawei client. Obtain and use only with applicable authorization and terms; download availability is not redistribution permission."
+    }
+  },
+  "hrtc": {
+    "version": "1.10.96",
+    "archive": "hrtc-12.eb3d2838.js",
+    "url": "https://meeting.huaweicloud.com/webrtc/static/js/12.eb3d2838.chunk.js",
+    "sha256": "ac223517d8cd516c2113181a5035093c9f30680380a61c518d08e79fd6c535f4",
+    "size": 597966,
+    "provenance": {
+      "publisherPage": "https://meeting.huaweicloud.com/webrtc/",
+      "assetManifest": "https://meeting.huaweicloud.com/webrtc/asset-manifest.json",
+      "manifestKey": "static/js/12.eb3d2838.chunk.js",
+      "rights": "Unmodified Huawei provider bundle, local build input only. Preserve embedded notices; backend admission and applicable provider terms remain required."
+    }
+  },
+  "background": {
+    "name": "@mediapipe/selfie_segmentation",
+    "version": "0.1.1675465747",
+    "archive": "selfie_segmentation-0.1.1675465747.tgz",
+    "url": "https://registry.npmjs.org/@mediapipe/selfie_segmentation/-/selfie_segmentation-0.1.1675465747.tgz",
+    "sha256": "7767b33eaa68990ee06c28bbb89f39a13a47ebb07ff0f1fd4947d9e817bb9bf9",
+    "integrity": "sha512-IxYxNhwE5VwOm52L1yoFWYLP7q9Pd+NJjzOC5tlepfvEGaY3o9hslhUrx9BgseqdfZtKSDtd/4NfCSMjNzQalA==",
+    "size": 4049373,
+    "root": "package",
+    "manifest": "custom-background.integrity.json",
+    "manifestSha256": "96ee5943a35ab3888fcf75ac84ab239ada21d9e6705cf4134122aa3dba1f691e",
+    "license": {
+      "spdx": "Apache-2.0",
+      "archive": "mediapipe-v0.10.0-LICENSE",
+      "url": "https://raw.githubusercontent.com/google-ai-edge/mediapipe/v0.10.0/LICENSE",
+      "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8",
+      "size": 12331
+    },
+    "provenance": {
+      "metadata": "https://registry.npmjs.org/@mediapipe/selfie_segmentation/0.1.1675465747",
+      "publisherPage": "https://google.github.io/mediapipe/solutions/selfie_segmentation",
+      "rights": "Package declares Apache-2.0. The upstream license is acquired separately because this npm archive does not include it; no model substitutions or runtime model downloads."
+    }
+  }
+}

@@ -25,20 +25,14 @@ def toolchain(args, sources, ffi):
     sysroot = sources["ffi-sysroot"]
     destination = args.toolchain_prefix / compiler["destination"]
     archive = fetch(compiler, args.cache)
-    if not destination.exists():
-        materialize(archive, destination, compiler["sha256"])
-        (destination / "cr_build_revision").write_text(compiler["revision"] + "\n")
-    elif (destination / "cr_build_revision").read_text().strip() != compiler["revision"]:
-        raise RuntimeError("Existing compiler is not the locked revision; select a new prefix")
+    materialize(archive, destination, compiler["sha256"],
+                generated={"cr_build_revision": compiler["revision"] + "\n"})
     for relative, expected in ffi["toolchain"]["sha256"].items():
         verify(args.toolchain_prefix / relative, expected)
     destination = args.toolchain_prefix / sysroot["destination"]
     archive = fetch(sysroot, args.cache)
-    if not destination.exists():
-        materialize(archive, destination, sysroot["sha256"])
-        (destination / ".stamp").write_text(sysroot["url"] + "\n")
-    elif (destination / ".stamp").read_text().strip() != sysroot["url"]:
-        raise RuntimeError("Existing FFI sysroot is not the locked source; select a new prefix")
+    materialize(archive, destination, sysroot["sha256"],
+                generated={".stamp": sysroot["url"] + "\n"})
 
 
 def source_archives(args, sources):
@@ -88,11 +82,13 @@ def main():
     parser.add_argument("--component", choices=COMPONENTS, action="append", help="repeat to select components; default: all")
     parser.add_argument("--cache", type=Path, default=REPO / ".inputs/archives")
     parser.add_argument("--deps-prefix", type=Path, default=REPO / ".inputs/native-deps")
+    parser.add_argument("--deps-archives", type=Path, help="hash-verified Debian development-package cache")
     parser.add_argument("--toolchain-prefix", type=Path, default=REPO / ".inputs/electron-toolchain")
     parser.add_argument("--json-prefix", type=Path, default=ROOT / "json-c")
     parser.add_argument("--sqlite-source", type=Path, default=REPO / "vendor/sqlite3mc-1.4.6")
     parser.add_argument("--ffi-archives", type=Path, default=ROOT / "ffi/archives")
     parser.add_argument("--runtime-prefix", type=Path, default=REPO / ".inputs/electron-runtime")
+    parser.add_argument("--runtime-archives", type=Path, help="hash-verified Debian runtime-package cache")
     parser.add_argument("--work", type=Path, default=REPO / ".work/bootstrap")
     parser.add_argument("--jobs", type=int, default=2)
     args = parser.parse_args()
@@ -109,7 +105,7 @@ def main():
     if "toolchain" in selected:
         toolchain(args, sources, ffi)
     if "deps" in selected:
-        prepare_deps(args.deps_prefix)
+        prepare_deps(args.deps_prefix, archives=args.deps_archives)
     if "sources" in selected:
         source_archives(args, sources)
     if "ffi" in selected:
@@ -120,8 +116,11 @@ def main():
     if "json-c" in selected:
         build_json(args)
     if "runtime" in selected:
-        subprocess.run([sys.executable, str(ROOT / "electron-runtime/fetch_packages.py"),
-                        "--prefix", str(args.runtime_prefix)], check=True)
+        command = [sys.executable, str(ROOT / "electron-runtime/fetch_packages.py"),
+                   "--prefix", str(args.runtime_prefix)]
+        if args.runtime_archives:
+            command += ["--archives", str(args.runtime_archives)]
+        subprocess.run(command, check=True)
     print("Prepared components: " + ", ".join(component for component in COMPONENTS if component in selected))
     print(f"Native build: WELINK_NATIVE_DEPS={args.deps_prefix} WELINK_ELECTRON_SOURCE={args.toolchain_prefix} WELINK_JSON_PREFIX={args.json_prefix} WELINK_SQLITE_SOURCE={args.sqlite_source} ./build.sh NativeIntegration/lib native-only")
 
