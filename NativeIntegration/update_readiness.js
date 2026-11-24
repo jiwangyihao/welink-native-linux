@@ -16,16 +16,16 @@ function inspectPedestal() {
     const element = document.querySelector(selector);
     return !!(element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0);
   };
+  // The pinned IM bundle mounts its actual content in the pedestal document.
+  // A former mainView placeholder or separate viewcontainer is not readiness.
+  const message = route === '/main/im' ? document.querySelector('[data-watermark="im-container"]') : null;
+  const messageRect = message && message.getBoundingClientRect();
   const mounted = route === '/login/Auth2Login/Webview' ? visible('.auth2-login-webview') :
     route === '/login/LoginPage' ? visible('#pc-account') && visible('#password') :
     route === '/login/WPFirstTimeAuthentication/empty' ? visible('.single-list-wrap:not(.verification-code) input.list-input') &&
       visible('.verification-code input.list-input') && visible('button.amu-btn-primary') :
-    route === '/main/im' ? visible('#mainView_im:not(.hidden)') : false;
+    route === '/main/im' ? !!(message && message.children.length && messageRect.width > 0 && messageRect.height > 0) : false;
   return { route, mounted, httpExports, exitProvider: !!(window.appService && typeof window.appService.exitApp === 'function') };
-}
-function inspectMessage() {
-  const root = document.querySelector('[data-watermark="im-container"]');
-  return !!(root && root.children.length && root.getBoundingClientRect().width > 0 && root.getBoundingClientRect().height > 0);
 }
 function inspectLogin() {
   return document.readyState === 'complete' && Array.from(document.querySelectorAll('input,button,canvas')).some(element => {
@@ -112,12 +112,10 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
         stable = 0;
         return;
       }
-      let surface = evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
+      let surface = evidence.route === '/main/im' || evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
       for (const contents of all) {
         if (surface || contents === pedestal || contents.isDestroyed() || contents.isLoading()) continue;
-        if (evidence.route === '/main/im' && canonical(contents, appRoot, 'viewcontainer.html')) {
-          surface = await contents.executeJavaScript('(' + inspectMessage.toString() + ')()', false);
-        } else if (evidence.route === '/login/Auth2Login/Webview' && /^https:\/\//.test(contents.getURL())) {
+        if (evidence.route === '/login/Auth2Login/Webview' && /^https:\/\//.test(contents.getURL())) {
           // The login BrowserView must contain real mounted input/QR controls;
           // merely creating the view or loading the parent shell is insufficient.
           const owner = electron.BrowserWindow.fromWebContents(pedestal);
@@ -146,4 +144,4 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
   timer.unref();
   return () => { disposed = true; clearInterval(timer); };
 }
-module.exports = { installReadiness, inspectPedestal, inspectMessage, inspectLogin };
+module.exports = { installReadiness, inspectPedestal, inspectLogin };

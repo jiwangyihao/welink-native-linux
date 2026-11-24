@@ -102,12 +102,24 @@ async function main() {
     assert.equal(allowed.inspect.followed, 1);
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
   const exports = Object.fromEntries(['middleGroundAjax', 'middleGroundPost', 'downloadUpgradeFile', 'cancelDownloadUpgradeFile'].map(name => [name, () => {}]));
+  const elements = new Map();
   const scope = { window: { getRoute: () => 'login/LoadingFailed', coreRsHttp: exports, appService: { exitApp() {} } },
-    document: { querySelector: () => ({ getBoundingClientRect: () => ({ width: 10, height: 10 }) }) }, location: { hash: '#/login/LoadingFailed' } };
+    document: { querySelector: selector => elements.get(selector) || null }, location: { hash: '#/login/LoadingFailed' } };
   const probe = () => vm.runInNewContext('(' + inspectPedestal.toString() + ')()', scope);
   assert.equal(probe().mounted, false, 'A complete shell at LoadingFailed cannot count as readiness');
   scope.window.getRoute = () => 'main/im';
-  assert.equal(probe().mounted, true);
+  assert.equal(probe().mounted, false, 'The message route alone is not a working surface');
+  elements.set('#mainView_im:not(.hidden)', { children: [{}], getBoundingClientRect: () => ({ width: 10, height: 10 }) });
+  assert.equal(probe().mounted, false, 'A legacy placeholder cannot stand in for the real message component');
+  let messageBounds = { width: 10, height: 10 };
+  const message = { children: [{}], getBoundingClientRect: () => messageBounds };
+  elements.set('[data-watermark="im-container"]', message);
+  assert.equal(probe().mounted, true, 'The visible inline message component is ready without a separate host document');
+  messageBounds = { width: 0, height: 0 };
+  assert.equal(probe().mounted, false, 'Hidden message content is not ready');
+  messageBounds = { width: 10, height: 10 };
+  message.children = [];
+  assert.equal(probe().mounted, false, 'An empty message mount is not ready');
   scope.window.getRoute = () => 'login/WPFirstTimeAuthentication/empty';
   const controls = new Set(['.single-list-wrap:not(.verification-code) input.list-input', '.verification-code input.list-input', 'button.amu-btn-primary']);
   scope.document.querySelector = selector => controls.has(selector) ? { getBoundingClientRect: () => ({ width: 10, height: 10 }) } : null;
