@@ -27,6 +27,9 @@ def main():
         for image, version in ((base, 'r45.7'), (new, 'r45.8')):
             (image / 'resources/app/native').mkdir(parents=True)
             (image / 'resources/app/native/build.json').write_text(json.dumps({'build': 'hit-native-linux-ia32-' + version}))
+            checker = image / 'resources/app/native/lib/sqlite_plugin.dll.so'
+            checker.parent.mkdir()
+            checker.write_bytes(('synthetic checker identity: ' + version).encode())
             for filename in ('LICENSE', 'electron', 'launch-welink', 'chrome-sandbox'):
                 (image / filename).write_text('synthetic installer input: ' + filename)
                 (image / filename).chmod(0o644 if filename == 'LICENSE' else 0o755)
