@@ -22,6 +22,7 @@ with Ed25519 pkeyutl -rawin support. Installation also requires sudo and the
 selected package manager. Nothing is installed to satisfy prerequisites.
 Run installation as your desktop user, never with sudo/root; only the package
 manager is elevated. Root may use --help or --verify-only, not installation.
+Downloads use a private directory under trusted /tmp; TMPDIR is ignored.
 No application is launched and no user profile is downloaded or changed here.
 USAGE
 }
@@ -100,9 +101,22 @@ trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-temp_parent=${TMPDIR:-/tmp}
-if [[ $temp_parent != /* ]]; then temp_parent="$PWD/$temp_parent"; fi
-work_dir=$(mktemp -d -- "$temp_parent/welink-native-install.XXXXXXXXXX")
+# The package manager later reopens the verified file by pathname. A private
+# child alone is insufficient if another user can rename entries in its parent.
+# Ignore TMPDIR and require a root-owned, non-symlink system temporary directory.
+python3 -I - <<'PY'
+import os
+import stat
+import sys
+
+for directory in ("/", "/tmp"):
+    info = os.lstat(directory)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0:
+        sys.exit("Error: Temporary storage requires a root-owned, non-symlink directory: " + directory)
+    if info.st_mode & 0o022 and (directory == "/" or not info.st_mode & stat.S_ISVTX):
+        sys.exit("Error: Unsafe writable parent of temporary storage: " + directory)
+PY
+work_dir=$(mktemp -d -- /tmp/welink-native-install.XXXXXXXXXX)
 
 base_url="https://github.com/jiwangyihao/welink-native-linux/releases/download/$version"
 download() {

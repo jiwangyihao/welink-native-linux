@@ -29,9 +29,10 @@ done
 [[ -x /usr/bin/amber-pm-convert && -x /var/lib/apm/apm/files/ace-run-pkg ]] || fail 'Install Amber PM and its real converter first'
 deb=$(realpath -e -- "$deb")
 [[ -f $deb ]] || fail 'The native DEB must be a regular file'
+native_version=$(dpkg-deb -f "$deb" Version)
 [[ $(dpkg-deb -f "$deb" Package) == cn.edu.hit.welink.native &&
-   $(dpkg-deb -f "$deb" Version) == 45.14-1 &&
-   $(dpkg-deb -f "$deb" Architecture) == amd64 ]] || fail 'Expected cn.edu.hit.welink.native 45.14-1 amd64, not an arbitrary DEB'
+   $native_version =~ ^45\.(0|[1-9][0-9]*)-1$ &&
+   $(dpkg-deb -f "$deb" Architecture) == amd64 ]] || fail 'Expected a versioned cn.edu.hit.welink.native amd64 package'
 base_root=/var/lib/apm/apm/files/ace-env/var/lib/apm/$base/files/ace-env
 [[ -d $base_root && -f $base_root/var/lib/dpkg/status ]] || fail "Install the complete APM base with: apm install $base"
 glibc=$(dpkg-query --admindir="$base_root/var/lib/dpkg" -W -f='${Version}' libc6:amd64)
@@ -39,7 +40,7 @@ dpkg --compare-versions "$glibc" ge 2.34 || fail "The selected base glibc $glibc
 mkdir -p -- "$output"
 output=$(realpath -e -- "$output")
 package=cn.edu.hit.welink.native.apm
-version=45.14-1-apm
+version=${native_version}-apm
 basename=${package}_${version}_amd64.deb
 [[ ! -e $output/$basename && ! -L $output/$basename ]] || fail 'Refusing to overwrite an existing APM release'
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)

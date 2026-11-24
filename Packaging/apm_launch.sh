@@ -10,6 +10,7 @@ export WELINK_NATIVE_APM_PACKAGE=cn.edu.hit.welink.native.apm
 unset INVOCATION_ID SYSTEMD_EXEC_PID
 exec /usr/bin/python3 -I - "$@" <<'PY'
 import ctypes
+import errno
 import fcntl
 import json
 import os
@@ -20,6 +21,7 @@ import socket
 import stat
 import struct
 import sys
+import time
 
 if os.getuid() == 0:
     raise SystemExit('Launch WeLink APM as the desktop user, not root')
@@ -32,10 +34,60 @@ lock = os.open(state / 'server.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o
 info = os.fstat(lock)
 if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
     raise SystemExit('Invalid APM lifetime lock')
-# A second raw `apm run` must not return (and trigger APM's shared overlay
-# unmount) while the first app/update lifetime is still active.
-fcntl.flock(lock, fcntl.LOCK_EX)
 filename = state / 'launch.sock'
+try:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    # Deliver a warm activation inside the original package namespace now.
+    # Then retain this `apm run` until the original lifetime ends: returning
+    # early would make upstream APM unmount the shared overlay. Never bootstrap
+    # again after the user closes that application.
+    for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(number, signal.SIG_IGN)
+    result = 0
+    try:
+        payload = json.dumps(sys.argv[1:]).encode() + b'\n'
+        if len(payload) > 65536:
+            raise ValueError('APM activation arguments are too large')
+        deadline = time.monotonic() + 10
+        while True:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.settimeout(10)
+                try:
+                    info = filename.lstat()
+                    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+                        raise ValueError('Refusing an unrelated APM activation socket')
+                    connection.connect(str(filename))
+                except OSError as error:
+                    if error.errno not in (errno.ENOENT, errno.ECONNREFUSED) or time.monotonic() >= deadline:
+                        raise
+                    time.sleep(0.1)
+                    continue
+                _, uid, _ = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+                if uid != os.getuid():
+                    raise ValueError('The APM activation server belongs to another user')
+                # Do not retry after sending: an uncertain acknowledgement
+                # must never duplicate a URI delivery.
+                connection.sendall(payload)
+                data = b''
+                while b'\n' not in data and len(data) <= 4096:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        raise ValueError('The APM activation server closed without acknowledging the request')
+                    data += chunk
+                if len(data) > 4096:
+                    raise ValueError('Invalid APM activation reply')
+                reply = json.loads(data)
+                if not isinstance(reply, dict) or reply.get('ok') is not True:
+                    raise ValueError(reply.get('error', 'APM activation failed') if isinstance(reply, dict) else 'Invalid APM activation reply')
+                break
+    except (OSError, ValueError) as error:
+        print('WeLink APM activation failed: ' + str(error), file=sys.stderr, flush=True)
+        result = 1
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_SH)
+        os.close(lock)
+    raise SystemExit(result)
 if filename.exists() or filename.is_symlink():
     info = filename.lstat()
     if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():

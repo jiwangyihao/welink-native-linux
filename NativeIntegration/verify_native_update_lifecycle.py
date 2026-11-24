@@ -57,6 +57,7 @@ class Lifecycle(unittest.TestCase):
         self.tx.work, self.tx.profile, self.tx.backup = self.work, self.profile, self.backup
         self.tx.base, self.tx.target, self.tx.home = self.base, self.target, self.root
         self.tx.systemd, self.tx.child, self.tx.unit = False, None, 'isolated-regression.service'
+        self.tx.apm_package = None
         self.tx.request = {'token': 'a' * 64, 'oldPid': 99999999, 'oldStartTime': '0'}
         self.tx.manifest = {'build': 'hit-native-linux-ia32-r45.12'}
         self.tx.journal = {'phase': 'starting', 'profile': str(self.profile), 'base': str(self.base), 'target': str(self.target),
