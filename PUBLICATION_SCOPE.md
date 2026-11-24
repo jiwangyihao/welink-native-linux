@@ -8,12 +8,12 @@ This is an interoperability reimplementation, not a claim of clean-room certific
 
 ## Inputs deliberately not published
 
-- Original commercial application bundles, `main.jsc`, SDK DLLs, native vendor runtimes, logos and other commercial resources.
+- Original commercial application bundles, `main.jsc`, SDK DLLs, proprietary vendor runtimes, logos and other commercial resources.
 - Decompiled reference C files, Ghidra databases and raw disassembly/research dumps.
 - User profiles, databases, cookies, credentials, meeting tickets, captured traffic, logs, recordings and screenshots.
-- Downloaded archives, compiled work directories and generated `NativeIntegration/app-overrides/`.
+- Private acquisition caches, proprietary archives, compiled work directories and reconstructed vendor overrides. Separately published, lawfully redistributable open-source runtime dependencies are described below; they are not the commercial client.
 
-The build requires the applicable original files as private local inputs. Their absence is an explicit prerequisite error, not an excuse for successful placeholder providers. Native source code is not replaced by prebuilt vendor libraries.
+The build obtains applicable original inputs through pinned acquisition scripts or documented lawful local-input methods. They remain private inputs. Their absence is an explicit prerequisite error, not an excuse for successful placeholder providers. Native source code is not replaced by prebuilt vendor libraries.
 
 ## Minimal vendor adaptation recipes
 
@@ -29,13 +29,15 @@ Electron/Chromium/V8/Node, libffi, ffi-napi, ref-napi, json-c, SQLite3MC, GLib, 
 
 The existing image assembler copies real license/notice texts for included open-source components and emits provenance and runtime dependency inventories. Static-library notices must accompany distributed native binaries. Patches against upstream open-source runtime code retain that project's terms for original context; the patch/provenance directory documents the applicable upstream licenses.
 
+The optional custom Electron runtime archive is an open-source build dependency with its original license/notice files, exact archive hash, source pins and corresponding port patches. It contains no commercial client, user profile or provider/model input. Using this archive is distinct from rebuilding Chromium from source; both paths must be documented honestly.
+
 Commercial meeting-provider assets and models are not made open-source merely because an adapter can load them. The corresponding first-party adapter/source is public; builders must obtain permissible original inputs separately where required.
 
 ## Public release assets
 
-The initial public distribution is a checked native delta for a specified installed native baseline, plus its source and desktop integration installer. It is not a standalone repack of the commercial client. GitHub's tag source archives contain the public source tree only. SHA256SUMS detects transfer/corruption errors; it is not a separate signing authority or a promise that an untrusted release is safe to execute.
+Application updates are checked native deltas for specified installed native baselines, plus their corresponding source and integration installer. They are not standalone repacks of the commercial client. GitHub's tag source archives contain the public source tree only. SHA256SUMS detects transfer/corruption errors; it is not a separate signing authority. Built-in installation additionally requires the exact release manifest's Ed25519 signature under the public key shipped in the trusted current image, compatible baseline selection and asset hashes before execution.
 
-No executable update is fetched or executed automatically by the GUI. The user chooses the real Release page and explicitly installs a matching artifact. Preserve the old image until the new image and real client behavior have been verified.
+After the user's installation choice, the GUI may download and execute the matching verified native installer as the desktop user. It must stage beside the old image, wait for normal exit, preserve the actual profile and desktop defaults, and require real new-version readiness before committing the update. Rollback backups stay private and never become release assets. Necessary system authorization is limited to the verified sandbox operation; the whole installer is not run as root. Signatures authenticate the configured publisher, not the quality or inherent safety of its code. The private signing key is not included in the repository, images or client.
 
 ## Explicit source/data exceptions
 

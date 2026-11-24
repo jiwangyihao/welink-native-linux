@@ -11,7 +11,7 @@
 #ifndef SQLITE_API
 #define SQLITE_API __attribute__((visibility("hidden")))
 #endif
-#include "vendor/sqlite3mc-1.4.6/sqlite3mc_amalgamation.h"
+#include <sqlite3mc_amalgamation.h>
 
 #define NATIVE_STORAGE_PLAIN_SIZE 240
 #define NATIVE_STORAGE_METADATA_SIZE 642

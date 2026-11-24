@@ -6,14 +6,17 @@
 #define IE_REQUEST_FD 3
 #define IE_CONTROL_FD 4
 #define IE_EVENT_FD 5
+#define IE_PROFILE_GATE_FD 6
 #define IE_REQUEST_LIMIT (1024U * 1024U)
 #define IE_EVENT_LIMIT 384U
 /* Private exec protocol, never a vendor wire command:
  * fd3: "WIE1", uint32 little-endian byte count, exactly that UTF-8 JSON request.
  * fd4: private Unix stream socket; byte 'C' or EOF requests cancellation.
  * fd5: uint32 little-endian byte count followed by original callback JSON.
+ * fd6: optional native-profile shared gate; held until the worker process exits.
  * The host withholds terminal status 4/5/6 until waitpid confirms clean exit.
- * No request, account, path or key is carried in argv, environment, or logs.
+ * No request, account or key is carried in argv, environment, or logs. Only the
+ * canonical native-profile location is retained in the worker environment.
  */
 static inline uint32_t ie_load_u32(const unsigned char p[4])
 { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }

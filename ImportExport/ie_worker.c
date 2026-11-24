@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -162,6 +163,15 @@ int main(int argc, char **argv)
     if (fstat(IE_REQUEST_FD, &request_info) || !S_ISFIFO(request_info.st_mode) ||
         fstat(IE_EVENT_FD, &event_info) || !S_ISFIFO(event_info.st_mode) ||
         fstat(IE_CONTROL_FD, &control_info) || !S_ISSOCK(control_info.st_mode)) return 65;
+    const char *profile = getenv("WELINK_NATIVE_PROFILE_DIR");
+    if (profile && *profile) {
+        struct stat gate;
+        if (fstat(IE_PROFILE_GATE_FD, &gate) || !S_ISREG(gate.st_mode) || gate.st_uid != getuid() ||
+            gate.st_nlink != 1 || (gate.st_mode & 07777) != 0600 ||
+            flock(IE_PROFILE_GATE_FD, LOCK_SH | LOCK_NB)) return 71;
+        /* Do not close this gate on cancellation or cleanup: COMMITTING may
+         * continue after the host exits, and only process exit releases it. */
+    }
     struct sigaction ignore = { .sa_handler = SIG_IGN }; sigemptyset(&ignore.sa_mask); sigaction(SIGPIPE, &ignore, NULL);
     job.desktop_fd = job.im_fd = job.account_fd = job.selected_fd = job.stage_fd = job.receive_fd = job.contact_fd = -1;
     atomic_init(&job.state, IE_RUNNING);

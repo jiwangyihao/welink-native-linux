@@ -1,54 +1,291 @@
-# Releasing native builds
+# Releasing signed native builds
 
-## Separation of versions
+## Build identity and publication boundary
 
-- Upstream desktop input: pinned vendor version and hashes in the override/assembly inputs.
-- Native port: `r45.9`, `r45.10`, …; the numeric components, not lexical order, determine which native build is newer.
-- Image identity: `hit-native-linux-ia32-r45.11:sha256:…`, produced by the actual immutable asset manifest.
+Native versions are `r45.N`; compare the final component numerically. Every image
+has a `hit-native-linux-ia32-r45.N` identity and a manifest-specific integrity
+checker. Follow [BUILD.md](BUILD.md) for the clean-input build entry point.
+Prepare immutable assets, compile their real checker, then finalize the image.
+Keep the previous image intact.
 
-A GitHub release does not imply that the upstream Windows updater can install it.
+Public releases contain authored source, minimal adaptation deltas, the
+generated native installers, and their signed manifest. Do not publish a
+commercial image, original SDK, account/profile data, model without applicable
+rights, whitebox tables, startup logs, or private recovery directories.
 
-## Build and verify privately
+The first updater-enabled image must be installed as an immutable new image,
+not injected into a running old image. Older releases which only open the
+release page cannot acquire the new updater retroactively. Once the
+updater-enabled build is running, subsequent supported releases install through
+the native GUI without asking users to run Python assets.
 
-Follow [BUILD.md](BUILD.md) with trusted local vendor/provider inputs. Keep all inputs, generated overrides and images in ignored/private work directories. Verify the native ABI, affected renderer behavior and real isolated Electron surfaces. Account/production-meeting tests require separate explicit authorization; do not publish their logs.
+## Publisher key and protocol
 
-Assembly order is mandatory: prepare immutable assets, compile the integrity checker against that generated manifest, then finalize. A checker from a different image is invalid. Preserve the previous image for rollback.
+`NativeIntegration/update_public_key.pem` is the pinned Ed25519 public key,
+included in the immutable application. Keep the corresponding private key
+outside the repository, application, build output, and client. The runtime has
+no environment/URL/IPC option for replacing its trust key. Synthetic keys in the
+deterministic tests are selected only by the test's module loader.
 
-## Produce a public update
+Each release publishes:
 
-`BASE` is the exact supported installed image; `IMAGE` is the finalized new image. `OUT` is a new private output directory. Native r45.11 publishes separate deltas from r45.8, r45.9 and r45.10. The latter two are withdrawn from stable selection because of a shared-HTTP-script startup regression. Generate each delta independently and name its required base explicitly; the example below uses r45.8.
+- `native-update.json`: exact UTF-8 JSON bytes, format 1.
+- `native-update.sig`: base64 Ed25519 signature over those exact bytes.
+- `install-r45.N-from-r45.M.py`: one generated installer per exact supported
+  baseline, bound to its build ID and `native/lib/sqlite_plugin.dll.so` SHA256.
+- `install_desktop.py`: the matching desktop integration implementation.
+
+The signed manifest includes `version`, `build`, full `sourceCommit`, all
+installer names/sizes/SHA256s/base checker hashes, and the integration
+name/size/SHA256. Tags, target identity, exact baseline, sizes and names must
+match. Duplicate/ambiguous entries, downgrades, unsafe paths and unsigned assets
+are rejected. API metadata never supplies an executable URL: downloads are
+constructed from this repository and tag. HTTPS redirects are limited to
+GitHub's explicit release-asset hosts, with bounded count and ordinary TLS.
+
+## Generate and sign a release
+
+`BASE` is the exact supported installed image, `IMAGE` the finalized target,
+`OUT` a new private output directory, and `VERSION`/`BASE_VERSION` their `r45.N`
+versions. Repeat packaging for each supported baseline; never relabel an
+existing image or substitute a checker from another build.
 
 ```sh
 mkdir -p "$OUT"
+cp NativeBuild/install_desktop.py "$OUT/install_desktop.py"
 python3 NativeBuild/package_update.py \
   --base-image "$BASE" --image "$IMAGE" \
-  --desktop-installer NativeBuild/install_desktop.py \
-  --output "$OUT/install-r45.11-from-r45.8.py"
-cp NativeBuild/install_desktop.py "$OUT/install_desktop.py"
-(cd "$OUT" && sha256sum install-r45.11-*.py install_desktop.py > SHA256SUMS)
+  --desktop-installer "$OUT/install_desktop.py" \
+  --output "$OUT/install-${VERSION}-from-${BASE_VERSION}.py"
+
+# Commit all reviewed source before signing/tagging; use that exact commit.
+node NativeBuild/sign_update.js \
+  --version "$VERSION" --source-commit "$SOURCE_COMMIT" \
+  --private-key "$PRIVATE_SIGNING_KEY" \
+  --public-key NativeIntegration/update_public_key.pem \
+  --output "$OUT" --integration "$OUT/install_desktop.py" \
+  --installer "$OUT/install-${VERSION}-from-${BASE_VERSION}.py"
+# Supply additional --installer arguments for additional supported baselines.
+(cd "$OUT" && sha256sum install-*.py install_desktop.py \
+  native-update.json native-update.sig > SHA256SUMS)
 ```
 
-The packager uses copy/literal operations rather than embedding complete changed vendor bundles. It checks reconstructed bytes, rejects new upstream files and oversized upstream literals, and preserves the installed base as a required input. Inspect the publication diff and any new literal material; a size limit is not a copyright or secret-scanning guarantee.
+The packager uses copy/literal deltas, validates reconstructed bytes, rejects
+new upstream files and oversized upstream literals, and retains a commercial
+base as a required local input. Inspect new literal material and publication
+scope; a size limit is not a copyright or secret-scanning guarantee.
 
-Test the generated installer in a new synthetic HOME with a private copy of the supported baseline. Check whole-image verification, restrictive legacy modes, the SUID sandbox link, desktop identity/default preservation and no profile reset. Do not use a logged-in user's home as a disposable fixture.
+The signer's identity header comes from the actual generated installer. It
+refuses a mismatched target or integration hash and validates every manifest
+entry with the same protocol used by the client. Do not modify JSON whitespace
+or assets after signing.
 
 ## Publish
 
-Commit the reviewed source before tagging, so every distributed native change has its corresponding MPL source. GitHub's source archives then refer to the same commit.
-
 ```sh
-gh release create r45.11 --repo jiwangyihao/welink-native-linux \
+gh release create "$VERSION" --repo jiwangyihao/welink-native-linux \
   --target "$SOURCE_COMMIT" --draft \
-  --title "Native Linux r45.11" --notes-file "$RELEASE_NOTES" \
-  "$OUT"/install-r45.11-*.py "$OUT/install_desktop.py" "$OUT/SHA256SUMS"
+  --title "Native Linux $VERSION" --notes-file "$RELEASE_NOTES" \
+  "$OUT"/install-*.py "$OUT/install_desktop.py" \
+  "$OUT/native-update.json" "$OUT/native-update.sig" "$OUT/SHA256SUMS"
 ```
 
-Before publishing the draft, download the uploaded assets into a separate directory and verify their checksums. Release notes must state the exact baseline, dependencies, manual-install commands, license/source link, what was actually tested, and limitations. Then publish the draft as a stable release. Do not upload a complete proprietary image, private profile, original SDK, model, debug dump, or old full-payload installer.
+Download the uploaded assets into a separate directory, verify their signature,
+sizes and SHA256s, then publish as stable. Drafts and prereleases are excluded
+from stable selection. Release notes state exact baselines, source/license
+links, actual acceptance evidence and limitations. `SHA256SUMS` is convenient
+transport evidence, not a substitute for the publisher signature.
 
-The GUI only checks Releases and opens a validated page after the user's decision. It never executes a downloaded installer, silently downgrades or announces installation success. Publishing a release is therefore distinct from installing it on any client.
+## Native GUI lifecycle
 
-## Manual installation
+Automatic checks remain silent and fetch metadata/signatures only. The About
+page's real **Check for updates** consumer offers **Download, update and
+restart** only after publisher and exact-baseline verification. All old Windows
+download/install/cancel APIs still reject with `ENOTSUP`; they are not aliases
+for native installation.
 
-Download both installers and `SHA256SUMS` from the same release, verify them, and inspect the source before execution. Exit the old application normally before switching. Run the versioned installer with `--activate`; it stages and verifies a side-by-side image and updates the desktop integration without starting the application. The native profile remains separate from all images.
+The dedicated native progress window reports actual downloaded bytes,
+reconstructed files and verified files. Canceling download/staging leaves the
+current app, profile, launcher and MIME defaults unchanged. No running image is
+modified. The generated installer stages a private side-by-side image and
+verifies the complete inventory; the detached supervisor independently verifies
+the publisher signature and executes only rehashed, sealed-memfd installer
+bytes.
 
-The old image remains available. Rollback requires normal exit of the new application and deliberately restoring the previous launcher/integration; never switch binaries underneath an active account session.
+The supervisor runs as the desktop user in a separate systemd user service,
+surviving the old application's service exit. Non-systemd/direct sessions use a
+detached process; a systemd-owned app never silently falls back to an inherited
+service lifetime. Required desktop dependencies include Python 3, OpenSSL with
+Ed25519 support, util-linux `flock`, systemd's user session, and normal desktop
+integration tools. Supervisor, new-version and rollback services receive explicit
+HOME/display/session/XDG settings rather than silently using the user manager's
+environment. Node, dynamic-loader, OpenSSL and Python injection variables are
+removed, including from the service environment.
+
+Sandbox authorization is narrow: first try an ordinary hardlink to the
+verified, already root-owned mode-4755 sandbox. If needed, try noninteractive
+sudo, then `pkexec` with the desktop's graphical polkit authorization agent.
+Only a fixed helper linking the existing verified sandbox is elevated. Source
+and destination-directory FDs stay open in the unprivileged installer, and the
+privileged operation is FD-anchored. The installer itself never runs as root.
+There is no `--no-sandbox`, TLS exception, arbitrary root copy, or root chmod.
+Staging must be on the installation filesystem for hardlink reuse; different
+sandbox bytes require a separately provisioned runtime, not an unsafe fallback.
+
+After staging, the app calls its existing `appService.exitApp` path. The
+supervisor observes the actual old PID/start time and profile processes exiting;
+an exit refusal/timeout leaves activation undone. It revalidates the staged
+image, privately backs up the explicit current native profile, preserves the
+exact desktop identity and all MIME defaults, and migrates only a profile-owned
+autostart entry without changing its enabled/disabled state. Customized or
+different-profile launchers are not overwritten.
+
+Profile mutation is protected by a shared startup gate, not merely a process
+scan. Its stable path is
+`PROFILE_PARENT/.welink-native-profile-gates/SHA256_CANONICAL_PROFILE.lock`,
+where the hash is over the UTF-8 canonical absolute profile path. The private
+directory is mode 0700 and its owned, single-link regular lock file is mode 0600.
+It is outside the profile and is neither moved during rollback nor selected by
+HOME/XDG settings.
+
+The launcher acquires SH before creating the profile, marker or pixbuf cache;
+its inherited descriptor is validated and actually locked, never accepted from
+an environment boolean. `main.js` independently acquires lifetime SH before
+profile initialization, covering direct Electron startup, and exports the
+canonical profile for native workers. Import/export workers retain their own
+validated SH descriptor through actual process exit, including COMMITTING and
+cleanup; requesting cancellation does not release ownership. The supervisor
+requires EX throughout backup/activation and restoration, releases it before
+launching an app, and retains process/inode/ownership checks as additional
+defenses. A contender admitted after a process scan prevents mutation; a
+contender arriving during mutation cannot enter the profile until it finishes.
+
+Older, retained binaries which predate this gate cannot be made cooperative
+retroactively. Do not directly run those binaries during update or recovery.
+Existing process checks can reject detected legacy instances but do not provide
+race-free admission for their future manual launches. Genuine GUI acceptance
+therefore requires a gate-aware baseline and target, including their native
+workers; do not describe an ungated legacy image as having the same protection.
+
+
+New startup success requires a receipt from the immutable new application:
+the real login or message route, mounted visible UI, the whole shared-HTTP
+exports, and real login guest controls or mounted IM content must be stable for
+three seconds. A PID, window, `did-finish-load`, or `coreUpgrade` object alone is
+not readiness. `/login/LoadingFailed` is an explicit failure. The supervisor
+checks the receipt's token, build, profile, live process identity and executable.
+
+On failed startup, the supervisor asks the new app to exit normally, and may
+terminate only its own failed launch if necessary. It never SIGKILLs the user's
+old app. It refuses restoration while any profile instance is live. Planned
+activation writes are journaled before application; rollback compares current
+bytes against that transaction, restores the pre-launch profile before reopening
+the old version, and never overwrites an unrelated later integration edit.
+Stopping safely is reported as an error, never as installation success.
+
+## Parent-run acceptance
+
+Implementation agents do not run these checks. After all assembly changes land:
+
+```sh
+node NativeIntegration/verify_native_update_protocol.js
+python3 NativeIntegration/verify_native_update_lifecycle.py
+node NativeIntegration/verify_native_update.js --app "$IMAGE/resources/app"
+```
+
+The last command executes the real assembled `HwUpgrade` consumer and the entire
+`libraries/js/httpWithRsSdk.js` **as a page script**, using the pedestal's require
+context. Retain the assembler's absolute
+`process.resourcesPath + '/app/native/update_renderer'` resolution; a relative
+`../../native/...` import resolves from the page and breaks real startup.
+Deterministic I/O fixtures are not GUI/real-install evidence.
+
+Exercise the actual generated installer in an isolated per-user HOME/profile,
+not a logged-in user's home. Verify stage-only behavior, modes, protected
+sandbox reuse, denied/canceled graphical authorization, complete inventory
+checks, explicit profile/default preservation, and rollback from a failed
+new-version startup. The lifecycle tests include sealed bytes, foreign trust
+roots, changed integration/profile ownership, partial activation, both
+profile-rename crash windows, old-exit refusal, canceled staging, invalid/dead
+readiness receipts, a real contender inserted after the final process scan,
+actual launcher pre-write gating, inherited-FD forgery rejection, gate retention
+through exec/exit, and explicit new/rollback service environment forwarding.
+Also run the built-worker `ImportExport/verify_profile_gate.c` acceptance for
+actual worker spawn/exec, cancellation versus exit and commit-lifetime ownership.
+
+For genuine release-to-release GUI acceptance, use two actual immutable
+updater-enabled builds and a signed compatible stable release. Start the old
+application normally with its explicit isolated profile and
+`--remote-debugging-port=19249`. The following observer uses Node 22+ for CDP and
+invokes the real manual-check consumer; a person or desktop automation must
+operate the real native controls. It never inserts UI, patches routes, changes
+app state, supplies a fake release, or manufactures readiness.
+
+```sh
+# First cancel in the actual progress window during staging, then close the
+# real cancellation/error dialog. Old PID and integration/defaults must remain.
+node NativeIntegration/verify_native_update_surface.js \
+  --port 19249 --expect available --version "$BASE_VERSION" \
+  --action cancel --target "$VERSION" --profile "$PROFILE"
+
+# Then choose Download, update and restart and allow the normal exit flow.
+node NativeIntegration/verify_native_update_surface.js \
+  --port 19249 --expect available --version "$BASE_VERSION" \
+  --action install --target "$VERSION" --profile "$PROFILE"
+```
+
+Capture actual download/staging/authorization UI. Verify the new executable and
+build identity, old PID exit, preserved profile/defaults, native readiness
+receipt and a usable real login/message route. No account login, message or
+meeting action is needed. Only report actual observed outcomes. Finally repeat
+the normal About check on the installed version and confirm `current`.
+
+## Manual installation and private recovery
+
+Manual recovery remains supported, but is not the GUI update path. Verify
+`native-update.sig` against the trusted image/repository public key before
+executing any downloaded asset:
+
+```sh
+base64 --decode native-update.sig > native-update.sig.bin
+openssl pkeyutl -verify -pubin \
+  -inkey "$BASE/resources/app/native/update_public_key.pem" \
+  -rawin -in native-update.json -sigfile native-update.sig.bin
+```
+
+Check the signed target/build, exact baseline checker and selected installer
+name/size/SHA256, plus the integration size/SHA256. Inspect the matching source.
+Exit the application normally before activation. The generated installer's
+default stages/verifies only; manual activation requires an explicit profile:
+
+```sh
+python3 "install-${VERSION}-from-${BASE_VERSION}.py" \
+  --base-image "$BASE" --profile "$PROFILE" \
+  --preserve-defaults --desktop-id cn.edu.hit.welink.native.desktop --activate
+```
+
+The installer never starts the app. `install_desktop.py` also supports explicit
+`--previous-image`/`--autostart-file` migration and `--plan` for exact, no-write
+activation planning.
+
+Private transaction journals/status/logs are under
+`~/.local/state/welink-native-updates/transaction-*`. Profile backups and the
+failed-start profile live in a private `.welink-update-*` sibling of the
+explicit profile, on its filesystem. Keep those directories private; never
+upload them as acceptance logs. Successful updates retain a backup for
+deliberate recovery rather than deleting user data.
+
+If the supervisor was externally interrupted during activation, first exit all
+instances using that profile. Use the old immutable application's helper:
+
+```sh
+python3 "$BASE/resources/app/native/update_supervisor.py" \
+  "$PRIVATE_TRANSACTION_DIRECTORY" --recover
+```
+
+Recovery revalidates the signature, obtains the update lock, checks the journal
+and live profile ownership, and restores only this incomplete transaction.
+Completed transactions are rejected: an old backup must not erase later user
+data. If another live process, replaced profile or later integration edit
+prevents safe restoration, retain the private backup and resolve that ownership
+conflict first; do not force-delete a profile or switch binaries beneath it.

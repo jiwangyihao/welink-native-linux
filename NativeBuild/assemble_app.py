@@ -44,6 +44,9 @@ NATIVE_EXECUTABLES = ("welink-import-export-worker", "welink-voice-worker", "wel
 NATIVE_HELPERS = (
     "main.js", "desktop_main.js", "ffi.js", "platform.js", "platform_main.js", "platform_settings.js",
     "update_config.js", "update_main.js", "update_renderer.js",
+    "update_manifest.js", "update_download.js", "update_install.js", "update_supervisor.py",
+    "update_readiness.js", "update_progress.html", "update_progress.js", "update_progress_preload.js",
+    "update_profile_gate.js", "update_public_key.pem",
     "im_adapter.js", "im_adapter_files.js", "im_adapter_forward.js", "im_adapter_main.js", "im_readiness.js",
     "meeting_main.js", "meeting_menu.js", "meeting_renderer.js", "meeting_service.js",
     "meeting_render_host.js", "meeting_render_notes.js",
@@ -123,6 +126,17 @@ fi
 PROFILE=$(realpath -m -- "$PROFILE")
 case "$PROFILE/" in "$IMAGE/"*) fail 'The profile must be outside the immutable image.' ;; esac
 case "$PROFILE/" in */.wine/*|*/drive_c/*|*/dosdevices/*) fail 'Wine state is not a native profile.' ;; esac
+# Acquire a stable SH gate before mkdir, ownership markers or pixbuf-cache
+# writes. The Python helper opens O_NOFOLLOW and execs back with a real inherited
+# FD; the resumed launcher verifies inode ownership and obtains flock again.
+# The descriptor remains open across exec, until Electron actually exits.
+unset LD_PRELOAD LD_AUDIT LD_LIBRARY_PATH NODE_PATH NODE_OPTIONS ELECTRON_RUN_AS_NODE PYTHONPATH PYTHONHOME OPENSSL_CONF OPENSSL_MODULES
+if [[ -n ${WELINK_NATIVE_PROFILE_GATE_FD:-} ]]; then
+  /usr/bin/python3 -I "$NATIVE/update_supervisor.py" --check-profile-gate "$PROFILE" "$WELINK_NATIVE_PROFILE_GATE_FD" ||
+    fail 'Invalid or unavailable inherited native profile gate.'
+else
+  exec /usr/bin/python3 -I "$NATIVE/update_supervisor.py" --launch-profile-gate "$PROFILE" "$SELF" "$@"
+fi
 if [[ -e $PROFILE ]]; then
   [[ -d $PROFILE && -O $PROFILE ]] || fail 'The native profile must be a directory owned by this user.'
 else
@@ -437,7 +451,7 @@ def install_licenses(args, app, providers, selections):
     copy_file(legal / "sqlite3mc-1.4.6.json", app / "native/provenance/sqlite3mc-license.json")
     # The pinned SQLite3MC amalgamation carries its incorporated ciphers' notices.
     # Extract actual legal comment blocks, not executable source or analysis code.
-    sqlite = args.native_integration.parent / "vendor/sqlite3mc-1.4.6/sqlite3mc_amalgamation.c"
+    sqlite = args.sqlite_source / "sqlite3mc_amalgamation.c"
     text = sqlite.read_text(encoding="utf-8")
     blocks = list(dict.fromkeys(block for block in re.findall(r"^/\*.*?^\s*\*/", text, re.M | re.S)
                                if re.search(r"copyright|permission is hereby granted|public domain|license|licence", block, re.I)))
@@ -477,7 +491,7 @@ def install_ffi(args, app):
 
 
 def install_management(args, app):
-    source = args.conference / "vendor/management"
+    source = args.management_input
     destination = app / "native/vendor/management"
     lock = load_json(source / "package-lock.json")
     copy_file(source / "package.json", destination / "package.json")
@@ -1289,7 +1303,7 @@ def install_native_updates(app):
 
 
 def install_overrides(args, app):
-    source = args.native_integration / "app-overrides"
+    source = args.vendor_overrides
     for path in tree_files(source):
         relative = path.relative_to(source)
         require(path.suffix in (".js", ".jsc", ".json", ".css", ".html", ".svg"), f"Non-asset app override: {relative}")
@@ -1403,7 +1417,8 @@ def normalize_times(root, epoch):
 def prepare(args):
     require(shutil.which("readelf") is not None, "readelf is required for static ELF metadata inspection")
     inputs = [args.vendor_app, args.native_integration, args.conference, args.ffi_output, args.electron_out,
-              args.native_libs, args.deps_prefix, args.electron_prefix, *args.extra_runtime_prefix]
+              args.native_libs, args.deps_prefix, args.electron_prefix, args.vendor_overrides,
+              args.provider_inputs, args.sqlite_source, args.management_input, *args.extra_runtime_prefix]
     for output in (args.output, args.manifest_dir):
         require(not output.exists() and not output.is_symlink(), f"Refusing existing output: {output}")
         require(all(not output.is_relative_to(root) and not root.is_relative_to(output) for root in inputs),
@@ -1417,9 +1432,13 @@ def prepare(args):
     required += [args.native_libs / name for name in NATIVE_LIBRARIES]
     required += [args.native_libs / name for name in NATIVE_EXECUTABLES]
     required += [args.electron_out / name for name in ELECTRON_FILES]
-    required += [args.native_integration / "app-overrides" / HOOK, args.ffi_output / "source-lock.json",
+    required += [args.vendor_overrides / HOOK, args.ffi_output / "source-lock.json",
                  args.deps_prefix / "packages.lock.json", args.deps_prefix / "sources/json-c-0.19/COPYING",
-                 args.native_integration.parent / "vendor/sqlite3mc-1.4.6/sqlite3mc_amalgamation.c"]
+                 args.sqlite_source / "sqlite3mc_amalgamation.c",
+                 args.management_input / "package.json", args.management_input / "package-lock.json",
+                 args.provider_inputs / "hrtc-12.eb3d2838.js",
+                 args.provider_inputs / "custom-background/integrity.json",
+                 args.provider_inputs / "custom-background/LICENSE"]
     required += [Path(__file__).resolve().parent / "electron-runtime/licenses" / name
                  for name in ("sqlite3mc-1.4.6-LICENSE", "sqlite3mc-1.4.6.json")]
     missing = [str(path) for path in required if not path.is_file()]
@@ -1450,11 +1469,11 @@ def prepare(args):
         copy_file(args.native_integration / name, app / "native" / name)
     for name in CONFERENCE_HELPERS:
         copy_file(args.conference / name, app / "native" / name)
-    offline_sdk = args.conference / "vendor/hrtc-12.eb3d2838.js"
+    offline_sdk = args.provider_inputs / "hrtc-12.eb3d2838.js"
     require(digest(offline_sdk) == "ac223517d8cd516c2113181a5035093c9f30680380a61c518d08e79fd6c535f4",
             "Unexpected offline HRTC bundle")
-    copy_file(offline_sdk, app / "native/vendor" / offline_sdk.name, args.conference)
-    background = args.conference / "vendor/custom-background"
+    copy_file(offline_sdk, app / "native/vendor" / offline_sdk.name, args.provider_inputs)
+    background = args.provider_inputs / "custom-background"
     manifest = background / "integrity.json"
     require(digest(manifest) == "96ee5943a35ab3888fcf75ac84ab239ada21d9e6705cf4134122aa3dba1f691e",
             "Unexpected custom-background model manifest")
@@ -1678,6 +1697,10 @@ def main():
     for name in ("vendor-app", "native-integration", "conference", "ffi-output", "electron-out", "native-libs",
                  "deps-prefix", "electron-prefix", "output", "manifest-dir"):
         prepare_parser.add_argument("--" + name, type=Path, required=True)
+    prepare_parser.add_argument("--vendor-overrides", type=Path, help="verified prepared override directory")
+    prepare_parser.add_argument("--provider-inputs", type=Path, help="verified HRTC and custom-background input directory")
+    prepare_parser.add_argument("--sqlite-source", type=Path, help="pinned SQLite3MC source directory for notices")
+    prepare_parser.add_argument("--management-input", type=Path, help="locked production management package tree")
     prepare_parser.add_argument("--build-id", required=True, help="deliberate release identity; the exact asset digest is appended")
     prepare_parser.add_argument("--extra-runtime-prefix", type=Path, action="append", default=[], help="additional extracted ia32 runtime packages, including notices; no host library search")
     prepare_parser.add_argument("--notice-map", type=Path, help="JSON object mapping exact DSO SHA256 to a list of real license files (paths relative to this JSON)")
@@ -1698,6 +1721,10 @@ def main():
             elif isinstance(value, list) and value and isinstance(value[0], Path):
                 setattr(args, name, [p.absolute().resolve() for p in value])
         if args.phase == "prepare":
+            args.vendor_overrides = (args.vendor_overrides or args.native_integration / "app-overrides").resolve()
+            args.provider_inputs = (args.provider_inputs or args.conference / "vendor").resolve()
+            args.sqlite_source = (args.sqlite_source or args.native_integration.parent / "vendor/sqlite3mc-1.4.6").resolve()
+            args.management_input = (args.management_input or args.conference / "vendor/management").resolve()
             require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,119}", args.build_id), "build-id must be a short explicit printable release identifier")
             require(args.source_date_epoch >= 0, "source-date-epoch must not be negative")
             for name in args.dlopen:

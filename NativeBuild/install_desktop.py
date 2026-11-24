@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install r45.8's per-user launcher and URL desktop integration (never the image).
+"""Install per-user launcher and URL desktop integration (never the image).
 
 Run as the desktop user after the sealed image has been installed:
   python3 install_desktop.py --image ~/.local/opt/hit-welink-native-r45.8/image
@@ -13,11 +13,15 @@ systemd-run --user, Type=exec and --collect). No application is started here.
 """
 
 import argparse
+import base64
+import json
+import hashlib
 import os
 from pathlib import Path
 import shlex
 import shutil
 import subprocess
+import stat
 import tempfile
 
 
@@ -112,10 +116,28 @@ def replace_file(filename, content, mode):
             os.unlink(temporary)
 
 
-def install(image, home, profile=None, direct_launch=False):
+def install(image, home, profile=None, direct_launch=False, preserve_defaults=False, desktop_id=None,
+            previous_image=None, autostart_file=None, plan_only=False):
     image = image.absolute()
     home = home.absolute()
     profile = profile.absolute() if profile else home / ".local/share/hit-welink-native/profile"
+    if profile.resolve() != profile or profile.is_symlink():
+        raise ValueError("The explicit native profile must be canonical")
+    # Activation is never an in-place change to a live native session.
+    for process in Path("/proc").iterdir():
+        if not process.name.isdecimal():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid() or process.resolve() == Path("/proc/self").resolve():
+                continue
+            executable = (process / "exe").readlink()
+            environment_bytes = (process / "environ").read_bytes().split(b"\0")
+            if executable.name == "electron" and (
+                    os.fsencode("WELINK_NATIVE_PROFILE_DIR=" + str(profile)) in environment_bytes or
+                    executable == image / "electron"):
+                raise ValueError("Exit the running native application normally before activating its profile")
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
     for required in (image / "electron", image / "launch-welink"):
         if not required.is_file() or not os.access(required, os.X_OK):
             raise ValueError("Missing executable in installed image: " + str(required))
@@ -124,7 +146,7 @@ def install(image, home, profile=None, direct_launch=False):
     if not home.is_dir() or home.stat().st_uid != os.getuid():
         raise ValueError("HOME must exist and belong to the installing user")
     mime_tool = shutil.which("gio")
-    if not mime_tool:
+    if not preserve_defaults and not mime_tool:
         raise ValueError("gio is required to register URL schemes safely; install the libglib2.0-bin package")
     if not shutil.which("xprop"):
         raise ValueError("xprop is required for real X11 window opacity; install the x11-utils package")
@@ -132,17 +154,62 @@ def install(image, home, profile=None, direct_launch=False):
         raise ValueError("systemd-run is required (or explicitly choose --direct-launch)")
     launcher = home / ".local/bin/hit-welink-native"
     applications = home / ".local/share/applications"
-    desktop_id = DESKTOP_ID
+    if desktop_id is not None and desktop_id not in (DESKTOP_ID, "cn.edu.hit.welink.native.desktop"):
+        raise ValueError("Unsupported desktop identity")
+    requested_id = desktop_id
+    desktop_id = desktop_id or DESKTOP_ID
     legacy = applications / "cn.edu.hit.welink.native.desktop"
-    if not (applications / desktop_id).exists() and legacy.is_file() and not legacy.is_symlink():
+    if not requested_id and not (applications / desktop_id).exists() and legacy.is_file() and not legacy.is_symlink():
         lines = legacy.read_text(encoding="utf-8").splitlines()
         if ("TryExec=" + desktop_value(str(launcher)) in lines and
                 "Name=WeLink (HIT Native)" in lines and "StartupWMClass=HIT APP" in lines):
             # Keep existing menu/pinned-launcher identity when upgrading rina.
             desktop_id = legacy.name
+    autostart_update = None
+    if autostart_file is not None:
+        if previous_image is None or autostart_file.parent.resolve() != autostart_file.parent:
+            raise ValueError("Autostart migration requires a canonical existing entry and previous image")
+        identifier = "cn.edu.hit.welink.native-" + hashlib.sha256(os.fsencode(profile)).hexdigest()[:16]
+        if autostart_file.name != identifier + ".desktop":
+            raise ValueError("Autostart entry is not owned by this profile")
+        if autostart_file.is_symlink() or not autostart_file.is_file() or autostart_file.stat().st_uid != os.getuid():
+            raise ValueError("Autostart entry is not a regular user-owned file")
+        text = autostart_file.read_text()
+        if ("X-WeLink-Native-Owner=" + identifier not in text.splitlines() or
+                "X-WeLink-Native-Profile=" + desktop_value(str(profile)) not in text.splitlines()):
+            raise ValueError("Autostart ownership marker differs")
+        old_app = previous_image.absolute() / "resources/app"
+        new_app = image / "resources/app"
+        expected = {
+            "Exec": "env " + exec_argument("WELINK_NATIVE_PROFILE_DIR=" + str(profile)) + " " +
+                    exec_argument(str(old_app / "native/launch-welink")) + " " + exec_argument(str(old_app)),
+            "TryExec": desktop_value(str(old_app / "native/launch-welink"))
+        }
+        replacement = {
+            "Exec": "env " + exec_argument("WELINK_NATIVE_PROFILE_DIR=" + str(profile)) + " " +
+                    exec_argument(str(new_app / "native/launch-welink")) + " " + exec_argument(str(new_app)),
+            "TryExec": desktop_value(str(new_app / "native/launch-welink"))
+        }
+        lines = text.splitlines()
+        for key, value in expected.items():
+            if lines.count(key + "=" + value) != 1:
+                raise ValueError("Autostart launch command was changed outside this installation")
+        autostart_update = "\n".join(
+            key + "=" + replacement[key] if (key := line.partition("=")[0]) in replacement else line
+            for line in lines) + "\n"
     entry = applications / desktop_id
-    replace_file(launcher, launcher_text(image, profile, direct_launch), 0o755)
-    replace_file(entry, desktop_text(image, launcher), 0o644)
+    writes = [(launcher, launcher_text(image, profile, direct_launch), 0o755),
+              (entry, desktop_text(image, launcher), 0o644)]
+    if autostart_update is not None:
+        writes.append((autostart_file, autostart_update, stat.S_IMODE(autostart_file.stat().st_mode)))
+    if plan_only:
+        if not preserve_defaults:
+            raise ValueError("Activation plans require --preserve-defaults")
+        return [{"path": str(filename), "data": base64.b64encode(text.encode()).decode(),
+                 "mode": mode, "sha256": hashlib.sha256(text.encode()).hexdigest()}
+                for filename, text, mode in writes]
+    for filename, text, mode in writes:
+        replace_file(filename, text, mode)
     # Use the existing desktop user's normal config, not a bridge/test XDG override.
     # GIO updates only the requested associations and handles HOME/application
     # paths as paths; xdg-mime's shell implementation splits paths with spaces.
@@ -151,7 +218,7 @@ def install(image, home, profile=None, direct_launch=False):
                        XDG_DATA_HOME=str(home / ".local/share"), LC_ALL="C")
     environment.pop("XDG_CONFIG_DIRS", None)
     environment.pop("XDG_DATA_DIRS", None)
-    for scheme in SCHEMES:
+    for scheme in (() if preserve_defaults else SCHEMES):
         mime = "x-scheme-handler/" + scheme
         subprocess.run([mime_tool, "mime", mime, desktop_id], env=environment, check=True)
         query = subprocess.check_output([mime_tool, "mime", mime], env=environment, text=True)
@@ -171,11 +238,21 @@ def main():
     parser.add_argument("--home", type=Path, default=Path.home(), help="Desktop user's HOME (default: current HOME)")
     parser.add_argument("--profile", type=Path, help="Existing native profile (default: HOME/.local/share/hit-welink-native/profile)")
     parser.add_argument("--direct-launch", action="store_true", help="Explicitly use exec instead of systemd-run (isolated/non-systemd sessions)")
+    parser.add_argument("--preserve-defaults", action="store_true", help="Preserve all current desktop/MIME defaults without invoking registration")
+    parser.add_argument("--desktop-id", choices=[DESKTOP_ID, "cn.edu.hit.welink.native.desktop"], help="Preserve the exact current desktop identity")
+    parser.add_argument("--previous-image", type=Path, help="Previous image, for owned autostart migration")
+    parser.add_argument("--autostart-file", type=Path, help="Exact existing profile-owned autostart entry to migrate without enabling it")
+    parser.add_argument("--plan", action="store_true", help="Output exact activation writes as JSON without modifying integration")
     args = parser.parse_args()
-    launcher, entry = install(args.image, args.home, args.profile, args.direct_launch)
+    result = install(args.image, args.home, args.profile, args.direct_launch, args.preserve_defaults,
+                     args.desktop_id, args.previous_image, args.autostart_file, args.plan)
+    if args.plan:
+        print(json.dumps(result, separators=(",", ":")))
+        return
+    launcher, entry = result
     print("Installed launcher:", launcher)
     print("Installed desktop entry:", entry)
-    print("Registered schemes:", ", ".join(SCHEMES))
+    print("Preserved existing MIME defaults" if args.preserve_defaults else "Registered schemes: " + ", ".join(SCHEMES))
     print("The application was not started; existing authentication/profile state was not changed.")
 
 

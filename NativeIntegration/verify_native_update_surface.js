@@ -10,6 +10,10 @@
 // observed expected status after publication (current for the installed release).
 const assert = require('assert').strict;
 const http = require('http');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
 const option = name => { const index = process.argv.indexOf(name); return index < 0 ? undefined : process.argv[index + 1]; };
 const port = Number(option('--port'));
 const expected = option('--expect');
@@ -17,6 +21,70 @@ const version = option('--version');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'Supply an isolated app --port');
 assert(['available', 'current', 'no-releases', 'error'].includes(expected), 'Supply --expect available|current|no-releases|error');
 assert(/^r45\.[0-9]+$/.test(version || ''), 'Supply the expected installed --version r45.N');
+const action = option('--action') || 'check';
+assert(['check', 'install', 'cancel'].includes(action), 'Supply --action check|install|cancel');
+const profile = option('--profile');
+const targetVersion = option('--target');
+const updatesDirectory = option('--updates-dir') || path.join(os.homedir(), '.local/state/welink-native-updates');
+if (action !== 'check') {
+  assert(expected === 'available' && /^r45\.[0-9]+$/.test(targetVersion || ''), 'Install/cancel needs --expect available --target r45.N');
+  assert(profile && path.isAbsolute(profile) && fs.realpathSync(profile) === profile, 'Supply the exact current canonical --profile');
+}
+function directoryNames() { try { return new Set(fs.readdirSync(updatesDirectory)); } catch (error) { if (error.code === 'ENOENT') return new Set(); throw error; } }
+function integrationHashes() {
+  const home = os.homedir();
+  const files = ['.local/bin/hit-welink-native', '.local/share/applications/cn.edu.hit.welink.native.desktop',
+    '.local/share/applications/hit-welink-native.desktop', '.config/mimeapps.list', '.local/share/applications/mimeapps.list'];
+  return files.map(name => { try { return crypto.createHash('sha256').update(fs.readFileSync(path.join(home, name))).digest('hex'); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; } });
+}
+async function observeTransaction(before, baselineHashes) {
+  const deadline = Date.now() + 35 * 60 * 1000;
+  let directory;
+  while (Date.now() < deadline) {
+    if (!directory) {
+      const candidates = [...directoryNames()].filter(name => !before.has(name) && name.startsWith('transaction-')).map(name => path.join(updatesDirectory, name));
+      for (const candidate of candidates) {
+        try {
+          const request = JSON.parse(fs.readFileSync(path.join(candidate, 'request.json'), 'utf8'));
+          const manifest = JSON.parse(fs.readFileSync(path.join(candidate, 'native-update.json'), 'utf8'));
+          if (request.profile === profile && manifest.version === targetVersion) {
+            assert(!directory, 'More than one matching transaction appeared'); directory = candidate;
+          }
+        } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      }
+    }
+    if (directory) {
+      let status;
+      try { status = JSON.parse(fs.readFileSync(path.join(directory, 'status.json'), 'utf8')); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (status && ['complete', 'failed', 'canceled'].includes(status.phase)) {
+        const request = JSON.parse(fs.readFileSync(path.join(directory, 'request.json'), 'utf8'));
+        if (action === 'cancel') {
+          assert.equal(status.phase, 'canceled', status.error);
+          assert.deepEqual(integrationHashes(), baselineHashes, 'Canceled update changed integration/defaults');
+          assert.equal(fs.existsSync('/proc/' + request.oldPid), true, 'Cancellation must leave the old app running');
+          assert.equal(fs.existsSync(path.join(directory, 'readiness.json')), false);
+          return { phase: status.phase, oldPid: request.oldPid };
+        }
+        assert.equal(status.phase, 'complete', status.error);
+        const receipt = JSON.parse(fs.readFileSync(path.join(directory, 'readiness.json'), 'utf8'));
+        assert.equal(receipt.token, request.token);
+        assert.equal(receipt.status, 'ready');
+        assert.equal(receipt.profile, profile);
+        assert.equal(receipt.build, 'hit-native-linux-ia32-' + targetVersion);
+        assert(['/main/im', '/login/Auth2Login/Webview', '/login/LoginPage'].includes(receipt.route));
+        const executable = fs.readlinkSync('/proc/' + receipt.pid + '/exe');
+        assert.equal(executable, path.join(path.dirname(path.dirname(request.baseImage)), 'hit-welink-native-' + targetVersion, 'image/electron'));
+        assert.equal(JSON.parse(fs.readFileSync(path.join(path.dirname(executable), 'resources/app/native/build.json'), 'utf8')).build, receipt.build);
+        assert.equal(fs.existsSync('/proc/' + request.oldPid), false, 'Old application must have really exited');
+        return { phase: status.phase, pid: receipt.pid, build: receipt.build, route: receipt.route, mounted: receipt.mounted };
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  throw new Error('The genuine update transaction did not complete before the scenario deadline');
+}
 assert.equal(typeof WebSocket, 'function', 'Use Node 22+ for the inspection transport');
 
 function targets() {
@@ -87,6 +155,27 @@ async function main() {
     assert.match(identity.result.value.electron, /^22\./);
     assert.equal(identity.result.value.consumer, 'function');
     assert.equal(identity.result.value.httpDownload, 'ENOTSUP');
+    if (action !== 'check') {
+      const before = directoryNames(), baselineHashes = integrationHashes();
+      console.log('Choose Download, update and restart in the REAL native dialog.' +
+        (action === 'cancel' ? ' Then choose Cancel update in the REAL progress window during staging.' : ' Observe download/staging/authorization; allow the normal exit flow.'));
+      const invoked = send('Runtime.evaluate', {
+        expression: 'window.coreUpgrade.checkUpgrade({entry:"native-signed-update-gui-acceptance",isUserClick:true})',
+        awaitPromise: true, returnByValue: true
+      }, 35 * 60 * 1000).catch(error => {
+        if (action === 'install' && /DevTools connection closed/.test(error.message)) return null;
+        throw error;
+      });
+      const [transaction, consumer] = await Promise.all([observeTransaction(before, baselineHashes), invoked]);
+      if (consumer) {
+        assert(!consumer.exceptionDetails, JSON.stringify(consumer.exceptionDetails));
+        if (action === 'install') assert.equal(consumer.result.value.action, 'restart-required');
+        else assert.equal(consumer.result.value.error.code, 'ECANCELED');
+      }
+      console.log(JSON.stringify({ status: 'passed', action, transaction,
+        boundary: 'Real vendor consumer, native controls, signed GitHub download, real supervisor and actual new process/route; no account actions.' }));
+      return;
+    }
     console.log('Invoking the live native update check. Inspect/capture the real dialog, then choose Close.');
     const evaluated = await send('Runtime.evaluate', {
       expression: 'window.coreUpgrade.checkUpgrade({entry:"native-release-surface-verification",isUserClick:true})', awaitPromise: true, returnByValue: true

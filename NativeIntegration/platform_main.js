@@ -7,6 +7,7 @@ const { fileURLToPath } = require('url');
 const { randomBytes } = require('crypto');
 const { createAutostart, failure } = require('./platform_settings');
 const { createNativeUpdater } = require('./update_main');
+const { installReadiness } = require('./update_readiness');
 const CHANNEL = 'welink-native-platform-v1';
 const installations = new WeakMap();
 
@@ -36,6 +37,8 @@ function installPlatformMain({ electron, appRoot, prepareExit }) {
   const updater = createNativeUpdater({ electron, appRoot: root });
   let owner = null;
   let disposed = false;
+  const stopReadiness = installReadiness({ electron, appRoot: root, profileRoot,
+    requestExit() { if (owner) send(owner, { type: 'native-update-exit' }); } });
 
   function launcher() {
     const executable = fs.realpathSync(paths.launcherPath);
@@ -250,7 +253,11 @@ function installPlatformMain({ electron, appRoot, prepareExit }) {
     if (!args.manual) return check();
     if (!registered.updateDialog) {
       registered.updateDialog = updater.present({ check, window: currentWindow(registered),
-        assertActive: () => assertActive(registered), locale: args.locale }).finally(() => {
+        assertActive: () => assertActive(registered), locale: args.locale, session: registered.contents.session,
+        registerCancel(cancel) {
+          registered.jobs.add(cancel);
+          return () => registered.jobs.delete(cancel);
+        } }).finally(() => {
         registered.updateDialog = null;
       });
     }
@@ -395,6 +402,7 @@ function installPlatformMain({ electron, appRoot, prepareExit }) {
   if (nativeTheme) nativeTheme.on('updated', onTheme);
   function dispose() {
     if (disposed) return;
+    stopReadiness();
     revokeOwner();
     disposed = true;
     ipcMain.removeListener(CHANNEL, onSync);

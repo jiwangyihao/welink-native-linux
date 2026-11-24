@@ -7,6 +7,7 @@ const { installMeetingMain } = require('./meeting_main');
 const { installImAdapterMain } = require('./im_adapter_main');
 const { installPlatformMain } = require('./platform_main');
 const { installWindowOpacity, createMainIpc } = require('./desktop_main');
+const { acquireProfileGate } = require('./update_profile_gate');
 
 let installation;
 
@@ -26,7 +27,14 @@ function install() {
   if (override && !path.isAbsolute(override)) throw new Error('WELINK_NATIVE_PROFILE_DIR must be absolute');
   // This is a new native profile. No Wine registry, account directory or key
   // store is imported, rewritten, or used as an authentication fallback.
-  const profileRoot = privateDirectory(override || path.join(app.getPath('appData'), 'cn.edu.hit.welink.native'));
+  const profileGate = acquireProfileGate({ profile: override || path.join(app.getPath('appData'), 'cn.edu.hit.welink.native') });
+  // Keep this SH descriptor open through native cleanup and actual process
+  // exit. Both direct Electron startup and launch-welink obey the same gate.
+  process.env.WELINK_NATIVE_PROFILE_DIR = profileGate.profileRoot;
+  // The launcher FD stays open, but its number must not leak as authority into
+  // later independent relaunches which do not inherit that open description.
+  delete process.env.WELINK_NATIVE_PROFILE_GATE_FD;
+  const profileRoot = privateDirectory(profileGate.profileRoot);
   const userData = privateDirectory(path.join(profileRoot, 'runtime'));
   const logs = privateDirectory(path.join(profileRoot, 'logs'));
   app.setPath('appData', profileRoot);
@@ -85,7 +93,7 @@ function install() {
     });
   });
 
-  installation = Object.freeze({ appRoot, profileRoot, dispose });
+  installation = Object.freeze({ appRoot, profileRoot, profileGateFd: profileGate.fd, dispose });
   return installation;
 }
 

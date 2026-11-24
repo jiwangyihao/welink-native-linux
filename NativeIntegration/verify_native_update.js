@@ -18,7 +18,30 @@ const index = process.argv.indexOf('--app');
 assert(index >= 0 && process.argv[index + 1], 'Supply --app ASSEMBLED_APP');
 const appRoot = fs.realpathSync(process.argv[index + 1]);
 const config = require(path.join(appRoot, 'native/update_config'));
-const { installPlatformMain } = require(path.join(appRoot, 'native/platform_main'));
+const crypto = require('crypto');
+const { publicKey: testPublicKey, privateKey: testPrivateKey } = crypto.generateKeyPairSync('ed25519');
+const manifestProtocol = require(path.join(appRoot, 'native/update_manifest'));
+let signatureCorrupt = false, manifestChange = value => value, nativeInstalls = 0, normalExits = 0;
+function loadMain(name, overrides) {
+  const filename = path.join(appRoot, 'native', name);
+  const module = { exports: {} }, original = createRequire(filename);
+  const wrapper = vm.runInThisContext('(function(require,module,exports,__filename,__dirname){' + fs.readFileSync(filename, 'utf8') + '\n})', { filename });
+  wrapper(name => Object.prototype.hasOwnProperty.call(overrides, name) ? overrides[name] : original(name), module, module.exports, filename, path.dirname(filename));
+  return module.exports;
+}
+// Synthetic publisher keys exist only in this test's module loader. Production
+// modules have no environment, URL, IPC or command-line trust-key override.
+const testedUpdater = loadMain('update_main.js', {
+  './update_manifest': { ...manifestProtocol, verifyManifest(bytes, signature, _key, context) {
+    return manifestProtocol.verifyManifest(bytes, signature, testPublicKey.export({ type: 'spki', format: 'pem' }), context);
+  } },
+  './update_install': { async installUpdate({ verified }) {
+    ++nativeInstalls;
+    assert(verified.bytes && verified.signature, 'Native installation must receive the verified manifest, never a renderer URL');
+    return { status: 'staged', action: 'restart-required', version: verified.version };
+  } }
+});
+const { installPlatformMain } = loadMain('platform_main.js', { './update_main': testedUpdater });
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'welink-native-updater-'));
 const plain = value => JSON.parse(JSON.stringify(value));
 const requests = [], dialogs = [], opened = [], errors = [], uiLoading = [];
@@ -31,11 +54,25 @@ function release(version, extra = {}) {
   return { tag_name: version, html_url: config.releasePage + version, draft: false, prerelease: false,
     name: 'Native ' + version, body: 'Native release notes for ' + version, ...extra };
 }
+function signedRelease(version) {
+  const current = JSON.parse(fs.readFileSync(path.join(appRoot, 'native/build.json'), 'utf8')).build;
+  const installedVersion = current.replace('hit-native-linux-ia32-', '');
+  const checker = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
+  const manifest = manifestChange({ format: 1, version, build: 'hit-native-linux-ia32-' + version, sourceCommit: 'a'.repeat(40),
+    installers: [{ base: current, baseCheckerSha256: checker, asset: 'install-' + version + '-from-' + installedVersion + '.py', size: 1, sha256: 'b'.repeat(64) }],
+    integration: { asset: 'install_desktop.py', size: 1, sha256: 'c'.repeat(64) } });
+  const bytes = Buffer.from(JSON.stringify(manifest));
+  const signature = crypto.sign(null, bytes, testPrivateKey);
+  if (signatureCorrupt) signature[0] ^= 1;
+  return { bytes, signature: Buffer.from(signature.toString('base64') + '\n') };
+}
 
 // Transport fixture follows the Electron 22 ClientRequest/IncomingMessage
 // event contract, including abort, errors, body streaming and redirects.
 const net = { request(options) {
-  const plan = replies.shift();
+  const asset = /\/releases\/download\/(r45\.[0-9]+)\/native-update\.(json|sig)$/.exec(options.url);
+  const signed = asset && signedRelease(asset[1]);
+  const plan = asset ? { body: asset[2] === 'json' ? signed.bytes : signed.signature } : replies.shift();
   assert(plan, 'Unexpected network request or automatic retry');
   const request = new EventEmitter();
   request.options = options;
@@ -102,6 +139,7 @@ const window = { langcode: '1033', navigator: { language: 'en' },
   dispatchEvent(value) { errors.push(value); },
   CustomEvent: class CustomEvent { constructor(type, options) { this.type = type; this.detail = options.detail; } },
   coreUi: { loadingfunc: value => uiLoading.push(value) } };
+window.appService = { async exitApp() { ++normalExits; } };
 function loadNative(name, overrides) {
   const filename = path.join(appRoot, 'native', name);
   const realRequire = createRequire(filename);
@@ -154,13 +192,13 @@ function expression(relative, predicate) {
 function evaluate(text, additions = {}) {
   return vm.runInNewContext('(' + text + ')', { window, Pedestal: window.Pedestal, process: window.process, ...additions }, { timeout: 10000 });
 }
-async function manual(plan, expected) {
+async function manual(plan, expected, expectedRequests = expected === 'available' ? 3 : 1) {
   const before = requests.length;
   replies.push(plan);
   const result = await window.coreUpgrade.checkUpgrade({ entry: 'aboutPage', isUserClick: true });
   assert(result, 'Vendor consumer must return the native receipt');
   assert.equal(result.status, expected);
-  assert.equal(requests.length, before + 1, 'One check must not retry');
+  assert.equal(requests.length, before + expectedRequests, 'Only metadata/signature requests are allowed during a check');
   assert.equal(replies.length, 0);
   return result;
 }
@@ -184,8 +222,9 @@ async function run() {
   assert.deepEqual(opened, [config.releasePage + numericNewer]);
   assert(dialogs.at(-1).detail.includes(currentVersion));
   assert(dialogs.at(-1).detail.includes('Native release notes for ' + numericNewer));
-  assert.match(dialogs.at(-1).detail, /installed manually/);
-  assert(!('assets' in available.latest), 'Asset URLs must not enter the native update protocol');
+  assert.match(dialogs.at(-1).detail, /publisher-signed/);
+  assert.equal(available.signed, true);
+  assert(!('assets' in available.latest), 'Untrusted API asset URLs must not enter the native update protocol');
   ++groups;
 
   for (const body of ['Preview heading\n' + 'wrapped content '.repeat(600) + '\nEnd of full notes',
@@ -235,7 +274,7 @@ async function run() {
   replies.push(response([release('r45.10')], { headers: { link: ['<' + config.api + '?page=2>; rel="next"'] } }), response([release('r45.101')]));
   const paged = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
   assert.equal(paged.latest.version, 'r45.101');
-  assert(requests.at(-1).options.url.endsWith('&page=2'));
+  assert(requests.filter(item => item.options.url.startsWith(config.api)).at(-1).options.url.endsWith('&page=2'));
   const beforePages = requests.length;
   for (let page = 0; page < config.maxPages; page++) replies.push(response([], { headers: { link: ['<' + config.api + '?page=999>; rel="next"'] } }));
   const tooMany = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
@@ -246,7 +285,7 @@ async function run() {
   const beforeSilent = { dialogs: dialogs.length, opened: opened.length };
   for (const check of [() => window.coreUpgrade.checkUpgrade({ entry: 'startup' }),
     () => window.coreUpgrade.checkUpdateBeforeLogin(), () => native.actions.showPcUpdateModel(),
-    () => native.actions.startDownload({ isShowModal: false }), () => native.transport.upgradeByHttp()]) {
+    () => native.transport.upgradeByHttp()]) {
     replies.push(response([release(nextVersion)]));
     assert.equal((await check()).status, 'available');
   }
@@ -256,15 +295,16 @@ async function run() {
   replies.push(response([release(nextVersion)]));
   const concurrent = await Promise.all([window.coreUpgrade.checkUpgrade({ isUserClick: true }), window.coreUpgrade.checkUpgrade({ isUserClick: true })]);
   assert(concurrent.every(item => item.status === 'available'));
-  assert.equal(requests.length, beforeConcurrent.requests + 1);
+  assert.equal(requests.length, beforeConcurrent.requests + 3);
   assert.equal(dialogs.length, beforeConcurrent.dialogs + 1);
   ++groups;
 
-  for (const fn of [native.actions.clickConfirmUpdate, native.actions.startInstallNewVer, native.actions.startDownload]) {
+  for (const fn of [native.actions.clickConfirmUpdate]) {
     replies.push(response([release(nextVersion)]));
     assert.equal((await fn()).status, 'available');
   }
-  for (const fn of [native.actions.cancelDownload, native.actions.dealDownloadFailed, native.actions.dealInstallFailed,
+  for (const fn of [native.actions.startDownload, native.actions.startInstallNewVer,
+    native.actions.cancelDownload, native.actions.dealDownloadFailed, native.actions.dealInstallFailed,
     native.transport.downloadFromHttp]) await assert.rejects(fn(), { code: 'ENOTSUP' });
   assert.throws(() => native.transport.getDownloadSuccessVersionCode(), { code: 'ENOTSUP' });
   ++groups;
@@ -299,12 +339,40 @@ async function run() {
 
   choices.push(1);
   shellError = true;
-  const openFailure = await manual(response([release(nextVersion)]), 'error');
+  const openFailure = await manual(response([release(nextVersion)]), 'error', 3);
   shellError = false;
   assert.match(openFailure.error.message, /browser refused/);
   assert.equal(openFailure.action, undefined, 'Browser launch failure cannot claim success');
   const denied = await handlers.get('welink-native-platform-v1')(event(), { owner: 'forged', operation: 'update-check', args: { manual: true, locale: 'en' } });
   assert.equal(denied.error.code, 'EACCES');
+  ++groups;
+  const beforeInstall = nativeInstalls;
+  for (const change of [
+    value => ({ ...value, build: 'hit-native-linux-ia32-r45.0' }),
+    value => ({ ...value, installers: [...value.installers, value.installers[0]] }),
+    value => ({ ...value, installers: [{ ...value.installers[0], baseCheckerSha256: '0'.repeat(64) }] }),
+    value => ({ ...value, integration: { ...value.integration, asset: '../install_desktop.py' } })
+  ]) {
+    manifestChange = change;
+    replies.push(response([release(nextVersion)]));
+    const failed = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
+    assert.equal(failed.status, 'error');
+    assert(['EPROTO', 'EBASE'].includes(failed.error.code));
+  }
+  manifestChange = value => value;
+  signatureCorrupt = true;
+  replies.push(response([release(nextVersion)]));
+  assert.equal((await window.coreUpgrade.checkUpgrade({ isUserClick: true })).error.code, 'ESIGNATURE');
+  signatureCorrupt = false;
+  assert.equal(nativeInstalls, beforeInstall, 'Failed signatures/compatibility cannot reach native execution');
+  assert.equal(normalExits, 0, 'Checking never exits the application');
+  choices.push(2);
+  replies.push(response([release(nextVersion)]));
+  const staged = await window.coreUpgrade.checkUpgrade({ isUserClick: true });
+  assert.equal(staged.status, 'staged', 'Staging is not installation success');
+  assert.equal(staged.action, 'restart-required');
+  assert.equal(nativeInstalls, beforeInstall + 1);
+  assert.equal(normalExits, 1, 'The dedicated native action requests the real renderer exit provider');
   ++groups;
 
   const timeout = await manual({ hang: true }, 'error');
@@ -318,9 +386,10 @@ async function run() {
   ++groups;
 
   for (const request of requests) {
-    assert.match(request.options.url, /^https:\/\/api\.github\.com\/repos\/jiwangyihao\/welink-native-linux\/releases\?per_page=100&page=[1-9][0-9]*$/);
+    assert(request.options.url.startsWith(config.api + '?') ||
+      /^https:\/\/github\.com\/jiwangyihao\/welink-native-linux\/releases\/download\/r45\.[0-9]+\/native-update\.(json|sig)$/.test(request.options.url));
     assert.equal(request.options.session, contents.session);
-    assert.equal(request.options.redirect, 'error');
+    assert.equal(request.options.redirect, request.options.url.startsWith(config.api) ? 'error' : 'manual');
     assert.equal(request.options.credentials, 'omit');
     assert.equal(request.options.useSessionCookies, false);
   }

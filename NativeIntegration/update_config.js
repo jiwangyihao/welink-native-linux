@@ -9,5 +9,9 @@ module.exports = Object.freeze({
   timeoutMs: 15000,
   maxBytes: 4 * 1024 * 1024,
   maxPages: 10,
-  pageSize: 100
+  pageSize: 100,
+  maxManifestBytes: 256 * 1024,
+  maxInstallerBytes: 512 * 1024 * 1024,
+  downloadTimeoutMs: 15 * 60 * 1000,
+  maxRedirects: 4
 });

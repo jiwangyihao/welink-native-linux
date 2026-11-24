@@ -15,6 +15,7 @@ the retained r6/r9 source archives do not contain its encrypted payload.
 directory contains only runtime files. --json-c-dir selects the private ia32
 JSON-C prefix. CC/--cc may include compiler arguments; pkg-config honors
 PKG_CONFIG_LIBDIR and PKG_CONFIG_SYSROOT_DIR. TMPDIR controls scratch staging.
+WELINK_SQLITE_SOURCE selects the pinned SQLite3MC headers matching the codec object.
 """
 import argparse
 import base64
@@ -87,9 +88,10 @@ def build_driver(directory, codec_object, compiler, json_prefix):
     env = dict(os.environ)
     env.setdefault("PKG_CONFIG_LIBDIR", "/usr/lib/i386-linux-gnu/pkgconfig:/usr/share/pkgconfig")
     packages = ["openssl"] if json_prefix else ["openssl", "json-c"]
+    sqlite_source = Path(env.get("WELINK_SQLITE_SOURCE") or SOURCE / "vendor/sqlite3mc-1.4.6")
     flags = subprocess.check_output(["pkg-config", "--cflags", "--libs", *packages], env=env, text=True)
     command = shlex.split(compiler) + ["-m32", "-O2", "-fvisibility=hidden", "-pthread",
-               "-I", str(SOURCE), "-x", "c", "-", "-x", "none",
+               "-I", str(sqlite_source), "-I", str(SOURCE), "-x", "c", "-", "-x", "none",
                str(SOURCE / "native_storage.c"), str(SOURCE / "kmc_compat.c"),
                str(codec_object)]
     if json_prefix:

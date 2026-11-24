@@ -8,7 +8,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <json-c/json.h>
+#include <limits.h>
 #include <openssl/crypto.h>
+#include <openssl/sha.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -18,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -107,6 +110,52 @@ static int lift_fd(int fd)
     int result = fcntl(fd, F_DUPFD_CLOEXEC, 10);
     int error = errno; close(fd); errno = error; return result;
 }
+/* Match the launcher/main/supervisor gate, outside the renamed profile tree.
+ * Workers retain their own shared description until exit, including COMMITTING. */
+static int profile_gate(int *result, char *environment, size_t capacity)
+{
+    *result = -1;
+    environment[0] = 0;
+    const char *profile = getenv("WELINK_NATIVE_PROFILE_DIR");
+    if (!profile || !*profile) return 0; /* Standalone non-profile ABI callers. */
+    char canonical[PATH_MAX], directory[PATH_MAX];
+    if (!realpath(profile, canonical)) return errno;
+    if (strcmp(profile, canonical) || !canonical[1]) return EINVAL;
+    int length = snprintf(environment, capacity, "WELINK_NATIVE_PROFILE_DIR=%s", canonical);
+    if (length < 0 || (size_t)length >= capacity) return ENAMETOOLONG;
+    const char *slash = strrchr(canonical, '/');
+    length = snprintf(directory, sizeof directory, "%.*s/.welink-native-profile-gates", (int)(slash - canonical), canonical);
+    if (length < 0 || (size_t)length >= sizeof directory) return ENAMETOOLONG;
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    if (!SHA256((const unsigned char *)canonical, strlen(canonical), hash)) return EIO;
+    static const char hex[] = "0123456789abcdef";
+    char name[SHA256_DIGEST_LENGTH * 2 + sizeof ".lock"];
+    for (unsigned i = 0; i < sizeof hash; ++i) {
+        name[i * 2] = hex[hash[i] >> 4];
+        name[i * 2 + 1] = hex[hash[i] & 15];
+    }
+    memcpy(name + sizeof hash * 2, ".lock", sizeof ".lock");
+    int parent = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (parent < 0) return errno;
+    struct stat dir_info, info, named;
+    int error = fstat(parent, &dir_info) ? errno : 0;
+    if (!error && (dir_info.st_uid != getuid() || (dir_info.st_mode & 07777) != 0700)) error = EPERM;
+    int gate = -1;
+    if (!error) {
+        gate = lift_fd(openat(parent, name, O_RDWR | O_NOFOLLOW | O_CLOEXEC));
+        if (gate < 0) error = errno;
+    }
+    if (!error && fstat(gate, &info)) error = errno;
+    if (!error && (!S_ISREG(info.st_mode) || info.st_uid != getuid() || info.st_nlink != 1 ||
+                   (info.st_mode & 07777) != 0600)) error = EPERM;
+    if (!error && flock(gate, LOCK_SH | LOCK_NB)) error = errno;
+    if (!error && fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW)) error = errno;
+    if (!error && (named.st_dev != info.st_dev || named.st_ino != info.st_ino)) error = ESTALE;
+    close(parent);
+    if (error) { if (gate >= 0) close(gate); return error; }
+    *result = gate;
+    return 0;
+}
 static int make_pipe(int descriptors[2])
 {
     int pair[2];
@@ -130,15 +179,20 @@ static int spawn_worker(pid_t *pid, int request, int control, int event)
     if (!error && (!S_ISREG(info.st_mode) || !(info.st_mode & 0111) || (info.st_mode & 0022))) error = EPERM;
     if (helper >= 0) close(helper);
     if (error) return error;
+    int gate = -1;
+    char profile_environment[PATH_MAX + sizeof "WELINK_NATIVE_PROFILE_DIR="];
+    error = profile_gate(&gate, profile_environment, sizeof profile_environment);
+    if (error) return error;
     posix_spawn_file_actions_t actions;
     error = posix_spawn_file_actions_init(&actions);
-    if (error) return error;
+    if (error) { if (gate >= 0) close(gate); return error; }
     if (!error) error = posix_spawn_file_actions_adddup2(&actions, request, IE_REQUEST_FD);
     if (!error) error = posix_spawn_file_actions_adddup2(&actions, control, IE_CONTROL_FD);
     if (!error) error = posix_spawn_file_actions_adddup2(&actions, event, IE_EVENT_FD);
     for (int fd = 0; !error && fd < 3; ++fd)
         error = posix_spawn_file_actions_addopen(&actions, fd, "/dev/null", fd ? O_WRONLY : O_RDONLY, 0);
-    if (!error) error = posix_spawn_file_actions_addclosefrom_np(&actions, 6);
+    if (!error && gate >= 0) error = posix_spawn_file_actions_adddup2(&actions, gate, IE_PROFILE_GATE_FD);
+    if (!error) error = posix_spawn_file_actions_addclosefrom_np(&actions, gate >= 0 ? IE_PROFILE_GATE_FD + 1 : IE_PROFILE_GATE_FD);
     posix_spawnattr_t attr;
     int attr_ready = !posix_spawnattr_init(&attr);
     if (!attr_ready && !error) error = ENOMEM;
@@ -148,10 +202,12 @@ static int spawn_worker(pid_t *pid, int request, int control, int event)
     if (!error) error = posix_spawnattr_setsigdefault(&attr, &defaults);
     if (!error) error = posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
     char *argv[] = { worker_path, IE_WORKER_ARGUMENT, NULL };
-    char *environment[] = { "LANG=C.UTF-8", "LC_ALL=C.UTF-8", runtime_environment, NULL };
+    char *environment[] = { "LANG=C.UTF-8", "LC_ALL=C.UTF-8", runtime_environment,
+                            profile_environment[0] ? profile_environment : NULL, NULL };
     if (!error) error = posix_spawn(pid, worker_path, &actions, &attr, argv, environment);
     if (attr_ready) posix_spawnattr_destroy(&attr);
     posix_spawn_file_actions_destroy(&actions);
+    if (gate >= 0) close(gate);
     return error;
 }
 static void *run_process(void *pointer)

@@ -3,6 +3,8 @@
 set -euo pipefail
 : "${WELINK_NATIVE_DEPS:?Set the isolated native dependency prefix}"
 compiler=${WELINK_NATIVE_CC:-${WELINK_ELECTRON_SOURCE:+$WELINK_ELECTRON_SOURCE/third_party/llvm-build/Release+Asserts/bin/}clang}
+source_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+sqlite_source=${WELINK_SQLITE_SOURCE:-$source_root/vendor/sqlite3mc-1.4.6}
 exec "$compiler" \
     --target=i686-linux-gnu --sysroot="$WELINK_NATIVE_DEPS/sysroot" \
-    --gcc-toolchain="$WELINK_NATIVE_DEPS/sysroot/usr" "$@"
+    --gcc-toolchain="$WELINK_NATIVE_DEPS/sysroot/usr" -I"$sqlite_source" "$@"

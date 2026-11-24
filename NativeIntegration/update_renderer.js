@@ -6,6 +6,10 @@ async function check(manual) {
   try {
     const result = await require('./platform').checkNativeUpdate(manual);
     if (result.status === 'error') console.error('Native Linux update:', result.error.code, result.error.message);
+    if (result.action === 'restart-required') {
+      // This is the vendor's real cleanup/exit flow, never app.exit/SIGKILL.
+      await window.appService.exitApp({ entry: 'native-signed-update-restart' });
+    }
     return result;
   } catch (error) {
     // Existing vendor event handlers do not await every check. Return an explicit
@@ -21,7 +25,7 @@ async function check(manual) {
 }
 
 function unsupported() {
-  throw failure('ENOTSUP', 'Native Linux updates are manual. Use Check for updates to review the native release page; in-app package download and installation are not supported.');
+  throw failure('ENOTSUP', 'Windows download and installation APIs are unavailable on Linux. Use the separately signed native update action in Check for updates.');
 }
 async function unsupportedAsync() { return unsupported(); }
 function backgroundCheck() { return check(false); }
@@ -33,8 +37,8 @@ const actions = {
   checkUpgrade(options = {}) { return check(options.isUserClick === true); },
   showPcUpdateModel: backgroundCheck,
   clickConfirmUpdate: manualCheck,
-  startDownload(options = {}) { return check(options.isShowModal !== false); },
-  startInstallNewVer: manualCheck,
+  startDownload: unsupportedAsync,
+  startInstallNewVer: unsupportedAsync,
   cancelDownload: unsupportedAsync,
   dealDownloadFailed: unsupportedAsync,
   dealInstallFailed: unsupportedAsync,

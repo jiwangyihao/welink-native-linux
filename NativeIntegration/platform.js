@@ -72,6 +72,8 @@ function onMessage(_event, message) {
       try { Promise.resolve(callback()).catch(report); }
       catch (error) { report(error); }
     }
+  } else if (message.type === 'native-update-exit') {
+    Promise.resolve(renderer().appService.exitApp({ entry: 'native-update-startup-rollback' })).catch(report);
   } else if (message.type === 'theme') {
     dispatch('systemThemeChange');
   } else if (message.type === 'window-event') {

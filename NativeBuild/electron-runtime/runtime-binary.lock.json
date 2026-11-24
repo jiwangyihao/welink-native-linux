@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "electronVersion": "22.3.26",
+  "platform": "linux",
+  "architecture": "ia32",
+  "sourceLockSha256": "55494ddf9686e412effd186d36944fb54aa30d47d75d863912ab13dbb2e9e8dd",
+  "argsGnSha256": "9e4178ad0e9c4c599a716879174cdfc82195399ccc94da5619f70a41597e25b3",
+  "archive": "electron-v22.3.26-linux-ia32-welink1.zip",
+  "url": "https://github.com/jiwangyihao/welink-native-linux/releases/download/runtime-electron-22.3.26-ia32-v1/electron-v22.3.26-linux-ia32-welink1.zip",
+  "sha256": "93676ec0ccc24f4e19a6cbd4733fcf132071d61d27e43beefed7d411bbd91229",
+  "size": 111687625,
+  "root": null,
+  "provenance": {
+    "sourceCommit": "eebb7225c1bf66fc6b6d499ff1b2623308be3aa0",
+    "sourceRecipe": "https://github.com/jiwangyihao/welink-native-linux/tree/eebb7225c1bf66fc6b6d499ff1b2623308be3aa0/NativeBuild/electron-runtime",
+    "noticeFiles": [
+      "LICENSE",
+      "LICENSES.chromium.html"
+    ],
+    "sandboxArchiveName": "chrome-sandbox",
+    "sandboxAssemblerName": "chrome_sandbox",
+    "securityBoundary": "Obsolete Electron 22; opt-in compatibility only for the exact trusted vendor bytecode baseline."
+  }
+}

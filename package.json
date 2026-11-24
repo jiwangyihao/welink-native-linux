@@ -1,6 +1,6 @@
 {
   "name": "welink-native-linux",
-  "version": "45.11.0",
+  "version": "45.13.0",
   "private": true,
   "license": "MPL-2.0",
   "engines": { "node": ">=20" },

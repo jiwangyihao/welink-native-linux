@@ -3,6 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('./update_config');
+const crypto = require('crypto');
+const { verifyManifest, assetUrl } = require('./update_manifest');
+const { download } = require('./update_download');
+const { installUpdate } = require('./update_install');
 const { failure } = require('./platform_settings');
 
 function revision(tag) {
@@ -134,6 +138,7 @@ function candidate(item) {
 }
 
 function createNativeUpdater({ electron, appRoot }) {
+  let verified = null;
   async function check({ session, signal }) {
     const current = readBuild(appRoot);
     const deadline = Date.now() + config.timeoutMs;
@@ -146,13 +151,27 @@ function createNativeUpdater({ electron, appRoot }) {
         const release = candidate(item);
         if (release && (!latest || revision(release.version) > revision(latest.version))) latest = release;
       }
-      if (!response.next) return { current, latest, status: latest ?
-        (revision(latest.version) > revision(current.version) ? 'available' : 'current') : 'no-releases' };
+      if (!response.next) {
+        const result = { current, latest, status: latest ?
+          (revision(latest.version) > revision(current.version) ? 'available' : 'current') : 'no-releases' };
+        if (result.status === 'available') {
+          const bytes = await download({ net: electron.net, session, signal,
+            url: assetUrl(latest.version, 'native-update.json'), limit: config.maxManifestBytes });
+          const signature = await download({ net: electron.net, session, signal,
+            url: assetUrl(latest.version, 'native-update.sig'), limit: 512 });
+          const key = fs.readFileSync(path.join(appRoot, 'native/update_public_key.pem'));
+          const checkerSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
+          verifyManifest(bytes, signature, key, { version: latest.version, current, checkerSha256 });
+          verified = { bytes, signature, version: latest.version, current };
+          result.signed = true;
+        }
+        return result;
+      }
     }
     throw failure('E2BIG', 'The native releases list exceeds the page limit; its latest version could not be determined.');
   }
 
-  async function present({ check: performCheck, window, assertActive, locale }) {
+  async function present({ check: performCheck, window, assertActive, locale, session, registerCancel }) {
     const zh = locale === '2052' || /^zh(?:-|$)/i.test(locale || '');
     const title = zh ? 'WeLink 原生 Linux 更新' : 'WeLink native Linux updates';
     let result;
@@ -161,8 +180,8 @@ function createNativeUpdater({ electron, appRoot }) {
       assertActive();
       const latest = result.latest;
       const current = (zh ? '当前原生版本：' : 'Installed native version: ') + result.current.version + '\n' + result.current.build;
-      const policy = zh ? '原生 Linux 版本仅支持手动更新。应用不会下载或运行 Windows 安装程序，也不会自动替换安装。请在发布页面阅读说明、校验 SHA256SUMS 后自行安装原生增量包。' :
-        'Native Linux updates are installed manually. This app does not download or run Windows installers or replace your installation. Read the release instructions and verify SHA256SUMS before installing a native-only delta package yourself.';
+      const policy = zh ? '仅安装发布者 Ed25519 签名且与当前镜像完全匹配的原生增量包。下载和验证期间保留当前应用；随后正常退出，备份当前配置并重启。失败时安全恢复旧版本。不运行 Windows 安装程序。' :
+        'Only publisher-signed native updates matching this exact image can be installed. Download and verification keep this app running; then it exits normally, preserves this profile and desktop defaults, and restarts. Failed startup restores the previous version. Windows installers are never run.';
       const notes = latest && (latest.notes || (zh ? '此版本没有发布说明。' : 'This release has no release notes.'));
       const preview = notes && notes.slice(0, 500).split('\n').slice(0, 8).join('\n');
       const detail = current + '\n\n' + policy + (latest ? '\n\n' + (zh ? '已发布原生版本：' : 'Published native version: ') + latest.version + '\n' + latest.name + '\n\n' +
@@ -171,9 +190,14 @@ function createNativeUpdater({ electron, appRoot }) {
         result.status === 'current' ? (zh ? '没有比当前版本更新的原生稳定版' : 'No newer native stable release is available') :
         (zh ? '此项目尚无已发布的原生稳定版' : 'No native stable releases have been published');
       const answer = await electron.dialog.showMessageBox(window, { type: 'info', title, message, detail,
-        buttons: latest ? [zh ? '关闭' : 'Close', zh ? '打开发布页面' : 'Open release page'] : [zh ? '关闭' : 'Close'],
+        buttons: latest ? [zh ? '关闭' : 'Close', zh ? '打开发布页面' : 'Open release page',
+          ...(result.status === 'available' && result.signed ? [zh ? '下载、更新并重启' : 'Download, update and restart'] : [])] : [zh ? '关闭' : 'Close'],
         defaultId: 0, cancelId: 0, noLink: true });
       assertActive();
+      if (answer.response === 2 && result.status === 'available' && result.signed) {
+        if (!verified || verified.version !== latest.version) throw failure('ESTALE', 'The signed update check changed. Check again before installing.');
+        return { ...result, ...await installUpdate({ electron, appRoot, window, session, verified, assertActive, registerCancel }) };
+      }
       if (latest && answer.response === 1) {
         await electron.shell.openExternal(releaseUrl(latest.url, latest.version), { activate: true });
         assertActive();
@@ -185,7 +209,7 @@ function createNativeUpdater({ electron, appRoot }) {
       let current = result && result.current;
       if (!current) { try { current = readBuild(appRoot); } catch (_) { /* Report the identity error below, never invent a version. */ } }
       await electron.dialog.showMessageBox(window, { type: 'error', title,
-        message: zh ? '原生更新检查或发布页面打开失败' : 'The native update check or release-page action failed',
+        message: zh ? '原生更新未完成' : 'The native update did not complete',
         detail: (current ? current.version + '\n' + current.build + '\n\n' : '') + (error.code || 'EIO') + ': ' + error.message,
         buttons: [zh ? '关闭' : 'Close'], defaultId: 0, cancelId: 0, noLink: true });
       assertActive();
