@@ -4,7 +4,7 @@
 
 - Upstream desktop input: pinned vendor version and hashes in the override/assembly inputs.
 - Native port: `r45.9`, `r45.10`, …; the numeric components, not lexical order, determine which native build is newer.
-- Image identity: `hit-native-linux-ia32-r45.9:sha256:…`, produced by the actual immutable asset manifest.
+- Image identity: `hit-native-linux-ia32-r45.10:sha256:…`, produced by the actual immutable asset manifest.
 
 A GitHub release does not imply that the upstream Windows updater can install it.
 
@@ -16,16 +16,16 @@ Assembly order is mandatory: prepare immutable assets, compile the integrity che
 
 ## Produce a public update
 
-`BASE` is the exact supported installed image; `IMAGE` is the finalized new image. `OUT` is a new private output directory. For the first public release, the base is native r45.8 and the target is native r45.9.
+`BASE` is the exact supported installed image; `IMAGE` is the finalized new image. `OUT` is a new private output directory. Native r45.10 publishes separate deltas from r45.8 and r45.9. Generate each independently and name its required base explicitly; the example below uses r45.8.
 
 ```sh
 mkdir -p "$OUT"
 python3 NativeBuild/package_update.py \
   --base-image "$BASE" --image "$IMAGE" \
   --desktop-installer NativeBuild/install_desktop.py \
-  --output "$OUT/install-r45.9.py"
+  --output "$OUT/install-r45.10-from-r45.8.py"
 cp NativeBuild/install_desktop.py "$OUT/install_desktop.py"
-(cd "$OUT" && sha256sum install-r45.9.py install_desktop.py > SHA256SUMS)
+(cd "$OUT" && sha256sum install-r45.10-*.py install_desktop.py > SHA256SUMS)
 ```
 
 The packager uses copy/literal operations rather than embedding complete changed vendor bundles. It checks reconstructed bytes, rejects new upstream files and oversized upstream literals, and preserves the installed base as a required input. Inspect the publication diff and any new literal material; a size limit is not a copyright or secret-scanning guarantee.
@@ -37,10 +37,10 @@ Test the generated installer in a new synthetic HOME with a private copy of the 
 Commit the reviewed source before tagging, so every distributed native change has its corresponding MPL source. GitHub's source archives then refer to the same commit.
 
 ```sh
-gh release create r45.9 --repo jiwangyihao/welink-native-linux \
+gh release create r45.10 --repo jiwangyihao/welink-native-linux \
   --target "$SOURCE_COMMIT" --draft \
-  --title "Native Linux r45.9" --notes-file "$RELEASE_NOTES" \
-  "$OUT/install-r45.9.py" "$OUT/install_desktop.py" "$OUT/SHA256SUMS"
+  --title "Native Linux r45.10" --notes-file "$RELEASE_NOTES" \
+  "$OUT"/install-r45.10-*.py "$OUT/install_desktop.py" "$OUT/SHA256SUMS"
 ```
 
 Before publishing the draft, download the uploaded assets into a separate directory and verify their checksums. Release notes must state the exact baseline, dependencies, manual-install commands, license/source link, what was actually tested, and limitations. Then publish the draft as a stable release. Do not upload a complete proprietary image, private profile, original SDK, model, debug dump, or old full-payload installer.

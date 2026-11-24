@@ -3,18 +3,20 @@
 
 // Parent-only genuine surface scenario, on an isolated desktop/profile:
 // launch the assembled application with --remote-debugging-port=19249, then
-// node verify_native_update_surface.js --port 19249 --expect no-releases
+// node verify_native_update_surface.js --port 19249 --expect current --version r45.10
 // The verifier invokes the REAL vendor manual-check consumer. Inspect/capture
 // the real native dialog, then dismiss it using its Close button. It neither
 // supplies a release fixture nor clicks/open-installs anything. Re-run with the
-// observed expected status after publication (current for the published r45.9).
+// observed expected status after publication (current for the installed release).
 const assert = require('assert').strict;
 const http = require('http');
 const option = name => { const index = process.argv.indexOf(name); return index < 0 ? undefined : process.argv[index + 1]; };
 const port = Number(option('--port'));
 const expected = option('--expect');
+const version = option('--version');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'Supply an isolated app --port');
 assert(['available', 'current', 'no-releases', 'error'].includes(expected), 'Supply --expect available|current|no-releases|error');
+assert(/^r45\.[0-9]+$/.test(version || ''), 'Supply the expected installed --version r45.N');
 assert.equal(typeof WebSocket, 'function', 'Use Node 22+ for the inspection transport');
 
 function targets() {
@@ -89,8 +91,8 @@ async function main() {
     const result = evaluated.result.value;
     assert(result, 'The real consumer did not return an update receipt');
     assert.equal(result.status, expected);
-    assert.equal(result.current.build, 'hit-native-linux-ia32-r45.9');
-    assert.equal(result.current.version, 'r45.9');
+    assert.equal(result.current.build, 'hit-native-linux-ia32-' + version);
+    assert.equal(result.current.version, version);
     if (expected === 'error') assert(result.error && result.error.code, 'Error outcome must remain explicit');
     else assert.equal(result.action, 'dismissed', 'Choose Close; this verification does not authorize browser launch or installation');
     if (result.latest) assert.equal(result.latest.url, 'https://github.com/jiwangyihao/welink-native-linux/releases/tag/' + result.latest.version);

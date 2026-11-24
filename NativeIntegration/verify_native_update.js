@@ -165,23 +165,37 @@ async function manual(plan, expected) {
 
 async function run() {
   const installed = JSON.parse(fs.readFileSync(path.join(appRoot, 'native/build.json'), 'utf8'));
-  assert.equal(installed.build, 'hit-native-linux-ia32-r45.9', 'Run this release regression against r45.9');
+  const match = /^hit-native-linux-ia32-(r45\.([0-9]+))$/.exec(installed.build);
+  assert(match, 'Supply a real native r45 image');
+  const currentVersion = match[1], revision = Number(match[2]);
+  const nextVersion = 'r45.' + (revision + 1);
+  const boundary = 10 ** String(revision).length;
+  const numericOlder = 'r45.' + (boundary - 1), numericNewer = 'r45.' + boundary;
   choices.push(1);
   const available = await manual(response([
-    release('r45.10'), release('r45.100'), release('r45.999', { draft: true }),
+    release(currentVersion), release(numericNewer), release('r45.999', { draft: true }),
     release('r45.998', { prerelease: true }), release('not-a-version'), release('r46.1'),
-    release('r45.99', { assets: [{ browser_download_url: 'https://example.invalid/WindowsPackage.exe' }] })
+    release(numericOlder, { assets: [{ browser_download_url: 'https://example.invalid/WindowsPackage.exe' }] })
   ]), 'available');
-  assert.equal(available.latest.version, 'r45.100', 'Native versions must compare numerically');
+  assert.equal(available.latest.version, numericNewer, 'Native versions must compare numerically across digit boundaries');
   assert.equal(available.action, 'release-page-opened');
-  assert.deepEqual(opened, [config.releasePage + 'r45.100']);
-  assert.match(dialogs.at(-1).detail, /r45\.9/);
-  assert.match(dialogs.at(-1).detail, /Native release notes for r45\.100/);
+  assert.deepEqual(opened, [config.releasePage + numericNewer]);
+  assert(dialogs.at(-1).detail.includes(currentVersion));
+  assert(dialogs.at(-1).detail.includes('Native release notes for ' + numericNewer));
   assert.match(dialogs.at(-1).detail, /installed manually/);
   assert(!('assets' in available.latest), 'Asset URLs must not enter the native update protocol');
   ++groups;
 
-  await manual(response([release('r45.9'), release('r45.8')]), 'current');
+  for (const body of ['Preview heading\n' + 'wrapped content '.repeat(600) + '\nEnd of full notes',
+    'Preview heading\n' + 'short line\n'.repeat(900) + 'End of full notes']) {
+    const result = await manual(response([release(nextVersion, { body })]), 'available');
+    assert(dialogs.at(-1).detail.includes('Preview heading'));
+    assert(!dialogs.at(-1).detail.includes('End of full notes'), 'Long notes must not push native dialog controls off screen');
+    assert.equal(result.latest.notes, body, 'The receipt retains the full release notes');
+  }
+  ++groups;
+
+  await manual(response([release(currentVersion), release('r45.8')]), 'current');
   assert.match(dialogs.at(-1).message, /No newer native stable release/);
   await manual(response([]), 'no-releases');
   assert.match(dialogs.at(-1).message, /No native stable releases have been published/);
@@ -231,13 +245,13 @@ async function run() {
   for (const check of [() => window.coreUpgrade.checkUpgrade({ entry: 'startup' }),
     () => window.coreUpgrade.checkUpdateBeforeLogin(), () => native.actions.showPcUpdateModel(),
     () => native.actions.startDownload({ isShowModal: false }), () => native.transport.upgradeByHttp()]) {
-    replies.push(response([release('r45.10')]));
+    replies.push(response([release(nextVersion)]));
     assert.equal((await check()).status, 'available');
   }
   assert.equal(dialogs.length, beforeSilent.dialogs, 'Automatic checks must not display upgrade UI');
   assert.equal(opened.length, beforeSilent.opened, 'Automatic checks must not open browsers');
   const beforeConcurrent = { requests: requests.length, dialogs: dialogs.length };
-  replies.push(response([release('r45.10')]));
+  replies.push(response([release(nextVersion)]));
   const concurrent = await Promise.all([window.coreUpgrade.checkUpgrade({ isUserClick: true }), window.coreUpgrade.checkUpgrade({ isUserClick: true })]);
   assert(concurrent.every(item => item.status === 'available'));
   assert.equal(requests.length, beforeConcurrent.requests + 1);
@@ -245,7 +259,7 @@ async function run() {
   ++groups;
 
   for (const fn of [native.actions.clickConfirmUpdate, native.actions.startInstallNewVer, native.actions.startDownload]) {
-    replies.push(response([release('r45.10')]));
+    replies.push(response([release(nextVersion)]));
     assert.equal((await fn()).status, 'available');
   }
   for (const fn of [native.actions.cancelDownload, native.actions.dealDownloadFailed, native.actions.dealInstallFailed,
@@ -284,7 +298,7 @@ async function run() {
 
   choices.push(1);
   shellError = true;
-  const openFailure = await manual(response([release('r45.10')]), 'error');
+  const openFailure = await manual(response([release(nextVersion)]), 'error');
   shellError = false;
   assert.match(openFailure.error.message, /browser refused/);
   assert.equal(openFailure.action, undefined, 'Browser launch failure cannot claim success');

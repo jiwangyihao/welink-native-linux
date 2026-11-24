@@ -164,8 +164,9 @@ function createNativeUpdater({ electron, appRoot }) {
       const policy = zh ? '原生 Linux 版本仅支持手动更新。应用不会下载或运行 Windows 安装程序，也不会自动替换安装。请在发布页面阅读说明、校验 SHA256SUMS 后自行安装原生增量包。' :
         'Native Linux updates are installed manually. This app does not download or run Windows installers or replace your installation. Read the release instructions and verify SHA256SUMS before installing a native-only delta package yourself.';
       const notes = latest && (latest.notes || (zh ? '此版本没有发布说明。' : 'This release has no release notes.'));
+      const preview = notes && notes.slice(0, 500).split('\n').slice(0, 8).join('\n');
       const detail = current + '\n\n' + policy + (latest ? '\n\n' + (zh ? '已发布原生版本：' : 'Published native version: ') + latest.version + '\n' + latest.name + '\n\n' +
-        notes.slice(0, 12000) + (notes.length > 12000 ? (zh ? '\n（完整说明请查看发布页面。）' : '\n(See the release page for the complete notes.)') : '') : '');
+        preview + (preview.length < notes.length ? (zh ? '\n（完整说明请查看发布页面。）' : '\n(See the release page for the complete notes.)') : '') : '');
       const message = result.status === 'available' ? (zh ? '发现新的原生 Linux 版本' : 'A native Linux update is available') :
         result.status === 'current' ? (zh ? '没有比当前版本更新的原生稳定版' : 'No newer native stable release is available') :
         (zh ? '此项目尚无已发布的原生稳定版' : 'No native stable releases have been published');
