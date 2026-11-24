@@ -21,12 +21,12 @@
 
 ### Bash、星火常用 DEB 与 APM
 
-当前公开安装包为 `cn.edu.hit.welink.native_45.14-1_amd64.deb`（标准 Debian/星火格式）和 `cn.edu.hit.welink.native.apm_45.14-1-apm_amd64.deb`（真实 APM 容器包）。新的兼容性修正仍在候选验收阶段，尚未发布；提供这些格式也不表示已获星火商店上架审核。
+r45.17 的发布构件包括 `cn.edu.hit.welink.native_45.17-1_amd64.deb`（标准 Debian/星火格式）和 `cn.edu.hit.welink.native.apm_45.17-1-apm_amd64.deb`（真实 APM 容器包）。提供这些格式不表示已获星火商店上架审核；实际可用版本以发行页的稳定版标记和签名清单为准。
 
 复制执行的入口是 Bash，不需要手动调用 Python 安装器：
 
 ```sh
-curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.14/install.sh -o install-welink.sh
+curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.17/install.sh -o install-welink.sh
 bash install-welink.sh
 # 或者选择已安装 APM 的系统：
 bash install-welink.sh --apm
@@ -57,9 +57,9 @@ r45.11 修正共享 HTTP 脚本在真实页面加载时的模块路径；r45.9 /
 
 ```sh
 python3 NativeBuild/full_build.py \
-  --work "$PWD/.work/full-r45.15" \
+  --work "$PWD/.work/full-r45.17" \
   --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.15 \
+  --build-id hit-native-linux-ia32-r45.17 \
   --accept-vendor-terms
 ```
 
@@ -73,9 +73,9 @@ python3 NativeBuild/full_build.py \
 
 最近的本地基线验收覆盖了加密数据库查询、IPv4/IPv6 本地 TLS、窗口/协议唤醒、图片剪贴板和会议退出回执。生产企业会议、真实音视频质量、全部会话类型及每一种桌面合成器仍需各自验证。不要从一次无错误日志推导“所有功能完成”。
 
-兼容性候选的隔离回归另外覆盖当前固定 WebRTC 消费者、真实音频输出 API 的完成/拒绝、文件复制错误传播、ZIP/ZIP64 完整性与原子替换一致性、超过 2 GiB 的有界内存复制和压缩，以及 renderer 崩溃/导航/关闭失败后的恢复与浏览器令牌清理。原生 X11、访客语音、自定义背景和报告路径使用合成输入与本地服务验证；不表示真实企业会议授权、硬件媒体质量或官方举报已经受理。网络变化仍显式返回错误，不以静默重试或伪造成功掩盖。
+r45.17 的隔离回归另外覆盖当前固定 WebRTC 消费者、真实音频输出 API 的完成/拒绝、文件复制错误传播、ZIP/ZIP64 完整性与原子替换一致性、超过 2 GiB 的有界内存复制和压缩，以及 renderer 崩溃/导航/关闭失败后的恢复与浏览器令牌清理。原生 X11、访客语音、自定义背景和报告路径使用合成输入与本地服务验证；不表示真实企业会议授权、硬件媒体质量或官方举报已经受理。网络变化仍显式返回错误，不以静默重试或伪造成功掩盖。
 
-现有资料上的正式升级验收仍未完成，不能把上述隔离结果视为正式更新成功。公开安装入口暂保持 r45.14，以发行页标注的稳定版为准。
+r45.17 已在 GXDE/X11 客户机的现有原生资料上完成签名升级、私有备份和真实消息页就绪验收；失败回滚也已实际验证。就绪检查要求原始 IM 组件可见且非空，不再误依赖旧占位节点或单独承载页；仅有消息路由、空容器或隐藏内容仍不能通过。该结果不代表所有账号、会议与桌面环境均已验收。
 
 仍需注意：Electron 22 / Node 16 已过时；目前固定支持的上游、ia32 ABI 和 X11 桌面范围有限。新的上游版本、ARM、原生 Wayland、实际会议授权及媒体质量都需要各自验证，不能由“能构建”或“能更新”推导为已经支持。
 

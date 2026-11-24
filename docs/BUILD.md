@@ -2,7 +2,7 @@
 
 This repository contains the native port and build recipes, **not the commercial client**. `NativeBuild/full_build.py` obtains the exact pinned inputs from their publishers (or verifies lawfully supplied original archives), compiles the real native libraries/workers and FFI, prepares the application, builds its manifest-specific integrity checker, and finalizes a usable image. No existing client, extracted source cache, account, or developer workspace is a build prerequisite. Building and running proprietary inputs still requires the applicable rights; a successful build is not desktop or account acceptance.
 
-The examples below use the explicit candidate identity `hit-native-linux-ia32-r45.15`; this does not claim publication or acceptance with an existing profile. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
+The release recipes below use the explicit identity `hit-native-linux-ia32-r45.17`. Do not substitute a stock x64 Electron build: the user-supplied cached bytecode requires the recorded ia32 Electron/V8 configuration. Source availability is not a claim that the obsolete Electron 22 runtime is secure for arbitrary content.
 
 ## Host prerequisites
 
@@ -34,7 +34,7 @@ python3 Packaging/build_deb.py \
   --source-commit "$SOURCE_COMMIT" --output "$OUT"
 # Run on a build machine with APM and its amber-pm-trixie base installed:
 bash Packaging/build_apm.sh \
-  --deb "$OUT/cn.edu.hit.welink.native_45.15-1_amd64.deb" --output "$OUT"
+  --deb "$OUT/cn.edu.hit.welink.native_45.17-1_amd64.deb" --output "$OUT"
 ```
 
 The public seed contains first-party/open-source binaries and minimal adaptation
@@ -77,7 +77,7 @@ From a new checkout, after installing the host prerequisites:
 python3 NativeBuild/full_build.py \
   --work "$PWD/.work/full-build" \
   --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.15 \
+  --build-id hit-native-linux-ia32-r45.17 \
   --accept-vendor-terms --jobs 2
 ```
 
@@ -102,7 +102,7 @@ To compile the custom Electron/Chromium runtime from source as well:
 python3 NativeBuild/full_build.py \
   --work "$PWD/.work/full-source-build" \
   --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.15 \
+  --build-id hit-native-linux-ia32-r45.17 \
   --runtime-mode source --accept-vendor-terms --jobs 2
 ```
 
@@ -128,7 +128,7 @@ The full builder supports these hash-checked local originals instead of those do
 ```sh
 python3 NativeBuild/full_build.py \
   --work "$PWD/.work/full-local-inputs" --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.15 --accept-vendor-terms \
+  --build-id hit-native-linux-ia32-r45.17 --accept-vendor-terms \
   --vendor-installer /absolute/path/to/original-HIT-installer.exe \
   --hrtc-bundle /absolute/path/to/12.eb3d2838.chunk.js \
   --background-archive /absolute/path/to/selfie_segmentation-0.1.1675465747.tgz \
@@ -281,7 +281,7 @@ python3 NativeBuild/assemble_app.py prepare \
   --native-libs "$ROOT/.work/manual-native-libs" --deps-prefix "$WELINK_NATIVE_DEPS" \
   --electron-prefix "$ROOT/.inputs/electron-runtime/root" \
   --output "$IMAGE" --manifest-dir "$MANIFEST" \
-  --build-id hit-native-linux-ia32-r45.15 --native-license "$ROOT/LICENSE"
+  --build-id hit-native-linux-ia32-r45.17 --native-license "$ROOT/LICENSE"
 
 WELINK_NATIVE_INTEGRITY_INCLUDE="$MANIFEST" \
   ./build.sh .work/manual-native-libs sqlite_plugin.dll.so
