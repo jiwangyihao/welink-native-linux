@@ -51,6 +51,28 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
   if (request.token !== token || request.profile !== profileRoot) throw new Error('Native update readiness context belongs to another profile');
   const build = JSON.parse(fs.readFileSync(path.join(appRoot, 'native/build.json'), 'utf8')).build;
   let running = false, disposed = false, sent = false, stable = 0, previous = '', stopping = false;
+  let lastObservation = '';
+  function observe(value, contents = []) {
+    const documents = [];
+    for (const item of contents) {
+      try {
+        const url = new URL(item.getURL());
+        if (url.protocol !== 'file:' || url.host) continue;
+        const filename = fileURLToPath(url);
+        if (filename.startsWith(appRoot + path.sep)) documents.push(path.relative(appRoot, filename));
+      } catch (_) { /* A destroyed frame has no current document. */ }
+    }
+    const data = JSON.stringify({ ...value, documents: documents.sort() });
+    if (data === lastObservation) return;
+    try {
+      const temporary = path.join(directory, 'readiness-observation-' + process.pid + '.tmp');
+      fs.writeFileSync(temporary, data, { flag: 'wx', mode: 0o600 });
+      fs.renameSync(temporary, path.join(directory, 'readiness-observation.json'));
+      lastObservation = data;
+    } catch (error) {
+      console.error('Native update observation:', error.message);
+    }
+  }
   function receipt(value) {
     const commandLine = electron.app.commandLine;
     const disabled = ['no-sandbox', 'disable-namespace-sandbox', 'disable-seccomp-filter-sandbox']
@@ -74,13 +96,22 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
       if (sent || stopping) return;
       const all = electron.webContents.getAllWebContents();
       const pedestal = all.find(contents => canonical(contents, appRoot, 'index.html'));
-      if (!pedestal || pedestal.isLoading()) return;
+      if (!pedestal || pedestal.isLoading()) {
+        observe({ phase: pedestal ? 'owner-loading' : 'owner-missing' }, all);
+        return;
+      }
       const evidence = await pedestal.executeJavaScript('(' + inspectPedestal.toString() + ')()', false);
       if (evidence.route.toLowerCase().includes('loadingfailed')) {
         receipt({ status: 'failed', error: 'The application entered /login/LoadingFailed', route: evidence.route });
         return;
       }
-      if (!evidence.mounted || !evidence.exitProvider || evidence.httpExports.join(',') !== HTTP_EXPORTS.join(',')) { stable = 0; return; }
+      const routeKind = evidence.route === '/main/im' ? 'messages' : evidence.route.startsWith('/login') ? 'login' : 'other';
+      if (!evidence.mounted || !evidence.exitProvider || evidence.httpExports.join(',') !== HTTP_EXPORTS.join(',')) {
+        observe({ phase: 'owner-controls-missing', routeKind, mounted: evidence.mounted,
+          exitProvider: evidence.exitProvider, httpExports: evidence.httpExports }, all);
+        stable = 0;
+        return;
+      }
       let surface = evidence.route === '/login/LoginPage' || evidence.route === '/login/WPFirstTimeAuthentication/empty';
       for (const contents of all) {
         if (surface || contents === pedestal || contents.isDestroyed() || contents.isLoading()) continue;
@@ -94,12 +125,18 @@ function installReadiness({ electron, appRoot, profileRoot, requestExit }) {
             surface = await contents.executeJavaScript('(' + inspectLogin.toString() + ')()', false);
         }
       }
-      if (!surface) { stable = 0; return; }
+      if (!surface) {
+        observe({ phase: 'content-missing', routeKind }, all);
+        stable = 0;
+        return;
+      }
+      observe({ phase: 'stabilizing', routeKind }, all);
       if (previous !== evidence.route) { previous = evidence.route; stable = Date.now(); }
       if (!stable) stable = Date.now();
       if (Date.now() - stable >= 3000) receipt({ status: 'ready', route: evidence.route, mounted: true, httpExports: evidence.httpExports });
     } catch (error) {
       stable = 0;
+      observe({ phase: 'inspection-error', error: error.name });
       // Navigating/destroyed frames are transient; the supervisor deadline is
       // authoritative and reports a failure if no genuine surface becomes ready.
       console.error('Native update readiness:', error.message);
