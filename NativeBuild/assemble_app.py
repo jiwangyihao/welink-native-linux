@@ -157,7 +157,29 @@ export WELINK_NATIVE_PROFILE_DIR=$PROFILE
 unset LD_PRELOAD LD_AUDIT NODE_PATH NODE_OPTIONS ELECTRON_RUN_AS_NODE
 unset PREBUILDS_ONLY FFI_NAPI_PREBUILD REF_NAPI_PREBUILD
 export LD_LIBRARY_PATH="$RUNTIME:$NATIVE/lib/runtime"
-export CHROME_DEVEL_SANDBOX="$RUNTIME/chrome-sandbox"
+SANDBOX_ARGS=()
+if [[ -n ${WELINK_NATIVE_APM_PACKAGE:-} ]]; then
+  [[ $WELINK_NATIVE_APM_PACKAGE = cn.edu.hit.welink.native.apm &&
+     ${IS_ACE_ENV:-} = 1 && ${APM_PKG_NAME:-} = "$WELINK_NATIVE_APM_PACKAGE" ]] ||
+    fail 'The APM sandbox backend requires the matching Amber PM application.'
+  for argument in "$@"; do
+    case "${argument%%=*}" in
+      --no-sandbox|--disable-namespace-sandbox|--disable-seccomp-filter-sandbox|--disable-gpu-sandbox)
+        fail 'Disabling Chromium sandbox protection is not supported in APM.' ;;
+    esac
+  done
+  [[ -f $RUNTIME/chrome-sandbox && ! -L $RUNTIME/chrome-sandbox && -O $RUNTIME/chrome-sandbox &&
+     $(stat -c '%a' -- "$RUNTIME/chrome-sandbox") = 755 ]] ||
+    fail 'The APM image requires its sealed, user-owned non-setuid sandbox payload.'
+  # Bubblewrap sets NO_NEW_PRIVS: setuid elevation is unavailable. Chromium must
+  # retain its own nested user/PID/network namespaces and seccomp sandbox.
+  /usr/bin/unshare --user --map-root-user --pid --net --fork /usr/bin/true ||
+    fail 'Nested user/PID/network namespaces are unavailable; refusing unsandboxed APM launch.'
+  unset CHROME_DEVEL_SANDBOX
+  SANDBOX_ARGS=(--disable-setuid-sandbox)
+else
+  export CHROME_DEVEL_SANDBOX="$RUNTIME/chrome-sandbox"
+fi
 # GdkPixbuf's real registry helper discovers the shipped decoder modules. This
 # disposable profile cache is NOT an integrity manifest or a trusted baseline.
 export GDK_PIXBUF_MODULEDIR="$NATIVE/lib/pixbuf-loaders"
@@ -170,7 +192,7 @@ mv -f -- "$CACHE" "$GDK_PIXBUF_MODULE_FILE"
 trap - EXIT
 # platform autostart/relaunch may supply the explicit app argument.
 if [[ ${1:-} = "$APP" ]]; then shift; fi
-exec "$RUNTIME/electron" "$APP" "$@"
+exec "$RUNTIME/electron" "$APP" "${SANDBOX_ARGS[@]}" "$@"
 '''
 
 

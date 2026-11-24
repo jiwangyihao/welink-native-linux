@@ -39,6 +39,14 @@ Application updates are checked native deltas for specified installed native bas
 
 After the user's installation choice, the GUI may download and execute the matching verified native installer as the desktop user. It must stage beside the old image, wait for normal exit, preserve the actual profile and desktop defaults, and require real new-version readiness before committing the update. Rollback backups stay private and never become release assets. Necessary system authorization is limited to the verified sandbox operation; the whole installer is not run as root. Signatures authenticate the configured publisher, not the quality or inherent safety of its code. The private signing key is not included in the repository, images or client.
 
+Fresh-install Debian and APM packages contain precompiled first-party and
+redistributable open-source components, original notices, and image recipes.
+Commercial app/provider/model bytes are not literal package payloads: first user
+launch obtains exact hash-pinned lawful upstream inputs after explicit consent.
+Recipes only reference unchanged bytes or carry the same limited adaptations
+described above. Packaging format does not expand redistribution or trademark
+rights. System package removal does not delete user profiles or private backups.
+
 ## Explicit source/data exceptions
 
 - The FFI `libraries/node_extends/node-ffi/ffi-napi/lib/library.js` override retains MIT-licensed upstream implementation. Its original copyright and permission text is included in [LICENSES/ffi-napi-MIT.txt](LICENSES/ffi-napi-MIT.txt); MPL covers our new modifications, not removal of that MIT notice.

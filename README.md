@@ -19,6 +19,26 @@
 
 发行页：<https://github.com/jiwangyihao/welink-native-linux/releases>
 
+### Bash、星火常用 DEB 与 APM
+
+r45.14 起提供两种实际软件包：`cn.edu.hit.welink.native_45.14-1_amd64.deb`（标准 Debian/星火格式）和 `cn.edu.hit.welink.native.apm_45.14-1-apm_amd64.deb`（真实 APM 容器包）。这表示提供相应格式，不表示已获星火商店上架审核。
+
+复制执行的入口是 Bash，不需要手动调用 Python 安装器：
+
+```sh
+curl -fL --proto '=https' https://github.com/jiwangyihao/welink-native-linux/releases/download/r45.14/install.sh -o install-welink.sh
+bash install-welink.sh
+# 或者选择已安装 APM 的系统：
+bash install-welink.sh --apm
+```
+
+脚本以普通用户运行，先校验 Ed25519 发布签名、包大小和 SHA256，再仅提权调用 APT/APM；`--verify-only` 只下载验证，不安装。初始脚本通过上述 HTTPS 地址获取；签名保护后续软件包，并不替代对脚本发布者的信任。
+
+**这些是带预编译原生组件的安装引导包，不是商业客户端的离线重打包。** 首次启动会明确请求上游使用授权，获取并校验约 307 MB 固定输入后组装完整镜像，不在用户机器上编译。可通过 `welink-native-setup` 指定同散列的合法离线输入。普通包需要 amd64、Python 3.11+ 和 ia32 glibc；APM 依赖其基础环境及可用的嵌套用户命名空间沙箱，不使用 `--no-sandbox`。
+
+包管理器管理系统侧引导器与公共组件，用户镜像由客户端签名更新维护。安装脚本不启动应用、不修改现有资料或默认关联；移除/清除软件包会保留用户镜像、资料和备份。APM 使用独立的 `~/.local/share/hit-welink-native-apm/profile`，不会自动导入或覆盖普通原生版资料。
+
+
 本项目使用独立的原生构建版本 `r45.x`，与上游客户端版本分开。Linux 的“检查更新”查询本仓库的原生稳定版；用户选择安装后，由内置流程验证发布签名和当前基线，下载正确的增量包、显示实际进度，在正常退出后切换并重新启动。**不会下载/执行 Windows `.exe`，不会执行未验证的网络脚本，也不会覆盖运行中的镜像。** 网络失败不等于“已是最新版本”。
 
 r45.10 起，长发布说明只显示有界预览，避免把原生对话框按钮挤出屏幕；完整内容通过发布页查看。
@@ -37,9 +57,9 @@ r45.11 修正共享 HTTP 脚本在真实页面加载时的模块路径；r45.9 /
 
 ```sh
 python3 NativeBuild/full_build.py \
-  --work "$PWD/.work/full-r45.13" \
+  --work "$PWD/.work/full-r45.14" \
   --cache "$PWD/.inputs/full-build-archives" \
-  --build-id hit-native-linux-ia32-r45.13 \
+  --build-id hit-native-linux-ia32-r45.14 \
   --accept-vendor-terms
 ```
 

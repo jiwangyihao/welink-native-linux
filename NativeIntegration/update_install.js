@@ -21,9 +21,9 @@ function privateDirectory(directory) {
   if (!info.isDirectory() || info.uid !== process.getuid() || (info.mode & 0o077) || fs.realpathSync(directory) !== directory)
     throw failure('EACCES', 'The native update directory must be private, canonical and user-owned.');
 }
-function desktopId(home, baseImage, profile) {
+function desktopId(home, baseImage, profile, apmPackage) {
   const directory = path.join(home, '.local/share/applications');
-  const launcher = path.join(home, '.local/bin/hit-welink-native');
+  const launcher = path.join(home, '.local/bin/' + (apmPackage ? 'hit-welink-native-apm' : 'hit-welink-native'));
   const info = fs.lstatSync(launcher);
   const quote = value => /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : "'" + value.replace(/'/g, "'\"'\"'") + "'";
   if (!info.isFile() || info.uid !== process.getuid() || info.nlink !== 1)
@@ -31,7 +31,9 @@ function desktopId(home, baseImage, profile) {
   const lines = fs.readFileSync(launcher, 'utf8').split('\n');
   if (!lines.includes('export WELINK_NATIVE_PROFILE_DIR=' + quote(profile)) || !lines.includes('image=' + quote(baseImage)))
     throw failure('EINTEGRATION', 'The desktop launcher belongs to another image/profile or was customized. It will not be overwritten.');
-  for (const id of ['cn.edu.hit.welink.native.desktop', 'hit-welink-native.desktop']) {
+  if (apmPackage && !lines.includes('export WELINK_NATIVE_APM_PACKAGE=' + quote(apmPackage)))
+    throw failure('EINTEGRATION', 'The installed launcher does not retain the APM context.');
+  for (const id of (apmPackage ? [apmPackage + '.desktop'] : ['cn.edu.hit.welink.native.desktop', 'hit-welink-native.desktop'])) {
     const filename = path.join(directory, id);
     try {
       const info = fs.lstatSync(filename);
@@ -64,12 +66,17 @@ async function installUpdate({ electron, appRoot, window, session, verified, ass
   const home = fs.realpathSync(electron.app.getPath('home') || os.homedir());
   const profile = fs.realpathSync(electron.app.getPath('appData'));
   const baseImage = fs.realpathSync(path.join(appRoot, '../..'));
+  const apmPackage = process.env.WELINK_NATIVE_APM_PACKAGE || null;
+  if (apmPackage && (apmPackage !== 'cn.edu.hit.welink.native.apm' ||
+      process.env.IS_ACE_ENV !== '1' || process.env.APM_PKG_NAME !== apmPackage ||
+      !process.env.WELINK_NATIVE_APM_SUPERVISOR_PID))
+    throw failure('EINTEGRATION', 'APM updates require the package lifetime supervisor inside Amber PM.');
   if (path.join(baseImage, 'resources/app') !== appRoot || fs.realpathSync(electron.app.getPath('exe')) !== path.join(baseImage, 'electron'))
     throw failure('EBUILD', 'The running executable is outside the installed native image.');
   const key = fs.readFileSync(path.join(appRoot, 'native/update_public_key.pem'));
   const checkerSha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(appRoot, 'native/lib/sqlite_plugin.dll.so'))).digest('hex');
   const selected = verifyManifest(verified.bytes, verified.signature, key, { version: verified.version, current: verified.current, checkerSha256 });
-  const stateRoot = path.join(home, '.local/state/welink-native-updates');
+  const stateRoot = path.join(home, '.local/state/' + (apmPackage ? 'welink-native-apm-updates' : 'welink-native-updates'));
   privateDirectory(stateRoot);
   const work = fs.mkdtempSync(path.join(stateRoot, 'transaction-'));
   const controller = new AbortController();
@@ -95,21 +102,23 @@ async function installUpdate({ electron, appRoot, window, session, verified, ass
     // Fail before app exit if a required supervisor dependency is missing.
     fs.accessSync('/usr/bin/python3', fs.constants.X_OK);
     fs.accessSync('/usr/bin/openssl', fs.constants.X_OK);
-    let systemd = true;
-    try { await run('/usr/bin/systemctl', ['--user', 'show-environment'], { timeout: 10000, maxBuffer: 1024 * 1024 }); }
-    catch (_) {
-      if (process.env.INVOCATION_ID) throw failure('ESUPERVISOR', 'A separate systemd user service is required to survive this application service exiting.');
-      systemd = false;
+    let systemd = !apmPackage;
+    if (systemd) {
+      try { await run('/usr/bin/systemctl', ['--user', 'show-environment'], { timeout: 10000, maxBuffer: 1024 * 1024 }); }
+      catch (_) {
+        if (process.env.INVOCATION_ID) throw failure('ESUPERVISOR', 'A separate systemd user service is required to survive this application service exiting.');
+        systemd = false;
+      }
     }
     const request = { baseImage, profile, oldPid: process.pid, oldStartTime: processStart(process.pid),
       autostartFile: (() => {
         const configHome = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
         if (!path.isAbsolute(configHome)) throw failure('EINVAL', 'XDG_CONFIG_HOME must be absolute.');
-        const filename = path.join(configHome, 'autostart', 'cn.edu.hit.welink.native-' +
+        const filename = path.join(configHome, 'autostart', (apmPackage || 'cn.edu.hit.welink.native') + '-' +
           crypto.createHash('sha256').update(profile).digest('hex').slice(0, 16) + '.desktop');
         return fs.existsSync(filename) ? filename : null;
       })(),
-      desktopId: desktopId(home, baseImage, profile), systemd, token: crypto.randomBytes(32).toString('hex') };
+      desktopId: desktopId(home, baseImage, profile, apmPackage), apmPackage, systemd, token: crypto.randomBytes(32).toString('hex') };
     fs.writeFileSync(path.join(work, 'request.json'), JSON.stringify(request), { flag: 'wx', mode: 0o600 });
     const command = ['/usr/bin/python3', '-I', path.join(appRoot, 'native/update_supervisor.py'), work];
     const environment = { ...process.env, HOME: home, PATH: '/usr/bin:/bin' };

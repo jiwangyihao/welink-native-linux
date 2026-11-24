@@ -34,6 +34,8 @@ Each release publishes:
 - `install-r45.N-from-r45.M.py`: one generated installer per exact supported
   baseline, bound to its build ID and `native/lib/sqlite_plugin.dll.so` SHA256.
 - `install_desktop.py`: the matching desktop integration implementation.
+- For fresh-install package releases: `install.sh`, the standard and APM `.deb`
+  assets, `native-packages.json`, and `native-packages.sig` as described below.
 
 The signed manifest includes `version`, `build`, full `sourceCommit`, all
 installer names/sizes/SHA256s/base checker hashes, and the integration
@@ -79,6 +81,44 @@ entry with the same protocol used by the client. Do not modify JSON whitespace
 or assets after signing.
 
 Release names and notes are included in the signed manifest. Publish the verified stable native release as GitHub's latest release; keep runtime-dependency releases marked `--latest=false`. A missing, inconsistent or invalid signed channel is an error, never a claim that the installed application is current.
+
+## Fresh-install package assets
+
+Build the finalized-image recipes and standard DEB using `Packaging/build_deb.py`
+as documented in BUILD.md. Convert that exact DEB with `Packaging/build_apm.sh`
+on an APM-equipped builder. An APM package is a real base/layer package, not the
+same Debian file renamed. Test both bootstrap paths in isolated user profiles;
+never use production credentials or report mere archive extraction as GUI proof.
+
+```sh
+node NativeBuild/sign_packages.js \
+  --version "$VERSION" --source-commit "$SOURCE_COMMIT" \
+  --deb "$OUT/cn.edu.hit.welink.native_${VERSION#r}-1_amd64.deb" \
+  --apm "$OUT/cn.edu.hit.welink.native.apm_${VERSION#r}-1-apm_amd64.deb" \
+  --private-key "$PRIVATE_SIGNING_KEY" \
+  --public-key NativeIntegration/update_public_key.pem --output "$OUT"
+cp install.sh "$OUT/install.sh"
+(cd "$OUT" && sha256sum install.sh *.deb native-packages.json native-packages.sig >> SHA256SUMS)
+```
+
+This separate format-1 manifest binds the native version, exact public source
+commit, and exactly one `deb` and `apm` descriptor (amd64, canonical filename,
+size and SHA256). It uses the same Ed25519 publisher authority, but does not add
+fields to or replace the baseline-specific `native-update.json` protocol.
+The signer verifies actual `dpkg-deb` control metadata before signing.
+
+Upload these additional assets to the same native release. Round-trip verify both
+packages and run `bash install.sh --verify-only` and `bash install.sh --apm
+--verify-only` against the public URLs before claiming the copy/paste entry is
+available. Full installation must also exercise the actual package manager,
+first-launch consent/acquisition, sealed-image validation and real desktop.
+APM additionally requires actual nested namespace/seccomp sandbox evidence and
+in-container lifecycle/URI handling. Never pass `--no-sandbox` to make a smoke pass.
+
+State the package model in release notes: system-managed public bootstrap and
+precompiled components, user-managed signed application images, explicit lawful
+upstream input acquisition, and retained user data on package removal. Do not
+describe these as offline commercial repacks or as store-approved submissions.
 
 ## Publish
 

@@ -19,6 +19,7 @@ import time
 
 
 DESKTOP_IDS = ('cn.edu.hit.welink.native.desktop', 'hit-welink-native.desktop')
+APM_PACKAGE = 'cn.edu.hit.welink.native.apm'
 BUILD = re.compile(r'hit-native-linux-ia32-(r45\.(0|[1-9][0-9]*))\Z')
 HASH = re.compile(r'[a-f0-9]{64}\Z')
 SESSION_ENVIRONMENT = ('HOME', 'PATH', 'DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'XDG_RUNTIME_DIR',
@@ -289,11 +290,35 @@ def readiness(value, token, build, image, profile):
     return pid
 
 
+def apm_context():
+    package = os.environ.get('WELINK_NATIVE_APM_PACKAGE')
+    if not package:
+        return None
+    if package != APM_PACKAGE or os.environ.get('IS_ACE_ENV') != '1' or os.environ.get('APM_PKG_NAME') != package:
+        raise RuntimeError('Native APM updates must remain inside their Amber PM application')
+    ancestor = os.environ.get('WELINK_NATIVE_APM_SUPERVISOR_PID', '')
+    if not ancestor.isdecimal() or int(ancestor) <= 1:
+        raise RuntimeError('Missing APM package lifetime supervisor')
+    pid = os.getppid()
+    while pid > 1 and str(pid) != ancestor:
+        text = (Path('/proc') / str(pid) / 'stat').read_text()
+        pid = int(text[text.rindex(')') + 2:].split()[1])
+    if str(pid) != ancestor:
+        raise RuntimeError('APM package lifetime supervisor is not an ancestor')
+    for namespace in ('mnt', 'user'):
+        if (Path('/proc') / ancestor / 'ns' / namespace).readlink() != (Path('/proc/self/ns') / namespace).readlink():
+            raise RuntimeError('APM supervisor namespace differs')
+    return package
+
+
 class Transaction:
     def __init__(self, work, recovering=False):
         self.work = work
         private(work)
         self.request = json.loads(file_bytes(work / 'request.json', 65536))
+        self.apm_package = apm_context()
+        if self.request.get('apmPackage') != self.apm_package:
+            raise RuntimeError('Update request APM context differs from the running supervisor')
         self.base = installed_image()
         if self.request.get('baseImage') != str(self.base):
             raise RuntimeError('Update transaction baseline differs from the supervisor installed image')
@@ -305,8 +330,10 @@ class Transaction:
         self.target = self.base.parent.parent / ('hit-welink-native-' + self.manifest['version']) / 'image'
         self.unit = 'welink-native-new-' + work.name + '.service'
         self.systemd = self.request['systemd'] is True
+        if self.apm_package and self.systemd:
+            raise RuntimeError('APM updates must not dispatch through host systemd')
         self.child = None
-        self.journal = {'phase': 'staging', 'profile': str(self.profile), 'base': str(self.base), 'target': str(self.target), 'files': []}
+        self.journal = {'phase': 'staging', 'profile': str(self.profile), 'base': str(self.base), 'target': str(self.target), 'apmPackage': self.apm_package, 'files': []}
         self.backup = None
         self.lock = os.open(work.parent / ('profile-' + hashlib.sha256(os.fsencode(self.profile)).hexdigest() + '.lock'), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -346,6 +373,8 @@ class Transaction:
     def run_installer(self):
         fd = sealed_asset(self.work, self.installer)
         command = ['/usr/bin/python3', '-I', '/proc/self/fd/' + str(fd), '--base-image', str(self.base), '--install-root', str(self.base.parent.parent), '--progress-json']
+        if self.apm_package:
+            command.append('--namespace-sandbox')
         stderr = (self.work / 'installer-error.log').open('wb')
         child = subprocess.Popen(command, pass_fds=[fd], stdout=subprocess.PIPE, stderr=stderr, start_new_session=True)
         os.close(fd)
@@ -443,9 +472,10 @@ class Transaction:
         self.journal['profileStat'] = [self.profile.stat().st_dev, self.profile.stat().st_ino]
         self.journal['backupStat'] = [self.backup.stat().st_dev, self.backup.stat().st_ino]
         desktop_id = self.request['desktopId']
-        if desktop_id not in DESKTOP_IDS:
+        if desktop_id not in ((self.apm_package + '.desktop',) if self.apm_package else DESKTOP_IDS):
             raise RuntimeError('Unsupported installed desktop identity')
-        paths = [self.home / '.local/bin/hit-welink-native', self.home / '.local/share/applications' / desktop_id]
+        paths = [self.home / '.local/bin' / ('hit-welink-native-apm' if self.apm_package else 'hit-welink-native'),
+                 self.home / '.local/share/applications' / desktop_id]
         if self.request.get('autostartFile'):
             paths.append(Path(self.request['autostartFile']))
         self.journal['files'] = [{'path': str(path), 'before': snapshot(path), 'installed': None} for path in paths]
@@ -453,6 +483,8 @@ class Transaction:
         fd = sealed_asset(self.work, self.manifest['integration'])
         try:
             command = ['/usr/bin/python3', '-I', '/proc/self/fd/' + str(fd), '--image', str(self.target), '--profile', str(self.profile), '--preserve-defaults', '--desktop-id', desktop_id]
+            if self.apm_package:
+                command.extend(['--apm-package', self.apm_package])
             if not self.systemd:
                 command.append('--direct-launch')
             if self.request.get('autostartFile'):
@@ -477,6 +509,8 @@ class Transaction:
         self.save('activated')
 
     def launch(self, image, receipt=False):
+        if apm_context() != self.apm_package:
+            raise RuntimeError('Application restart lost its APM context')
         environment = dict(os.environ, HOME=str(self.home), PATH='/usr/bin:/bin', WELINK_NATIVE_PROFILE_DIR=str(self.profile))
         for name in list(environment):
             if name.startswith(('WELINK_NATIVE_UPDATE_', 'NODE_', 'LD_', 'OPENSSL_', 'PYTHON')) or name in ('ELECTRON_RUN_AS_NODE', 'WELINK_NATIVE_PROFILE_GATE_FD'):
@@ -514,7 +548,22 @@ class Transaction:
             receipt = self.work / 'readiness.json'
             if receipt.exists():
                 value = json.loads(file_bytes(receipt, 16384))
-                readiness(value, self.request['token'], self.manifest['build'], self.target, self.profile)
+                pid = readiness(value, self.request['token'], self.manifest['build'], self.target, self.profile)
+                if self.apm_package:
+                    process = Path('/proc') / str(pid)
+                    environment = (process / 'environ').read_bytes().split(b'\0')
+                    for name, expected in (('WELINK_NATIVE_APM_PACKAGE', self.apm_package),
+                                           ('APM_PKG_NAME', self.apm_package), ('IS_ACE_ENV', '1')):
+                        if os.fsencode(name + '=' + expected) not in environment:
+                            raise RuntimeError('Updated application lost its APM environment')
+                    for namespace in ('mnt', 'user'):
+                        if (process / 'ns' / namespace).readlink() != (Path('/proc/self/ns') / namespace).readlink():
+                            raise RuntimeError('Updated application escaped its APM namespace')
+                    arguments = (process / 'cmdline').read_bytes().split(b'\0')
+                    if b'--disable-setuid-sandbox' not in arguments or any(
+                            argument.partition(b'=')[0] in (b'--no-sandbox', b'--disable-namespace-sandbox', b'--disable-seccomp-filter-sandbox')
+                            for argument in arguments):
+                        raise RuntimeError('Updated application is not using the required Chromium namespace sandbox')
                 return
             if self.child and self.child.poll() is not None:
                 raise RuntimeError('The new application exited before becoming ready')
@@ -576,7 +625,8 @@ class Transaction:
 
     def recover(self):
         journal = json.loads(file_bytes(self.work / 'journal.json', 1024 * 1024))
-        if journal.get('profile') != str(self.profile) or journal.get('base') != str(self.base) or journal.get('target') != str(self.target):
+        if (journal.get('profile') != str(self.profile) or journal.get('base') != str(self.base) or
+                journal.get('target') != str(self.target) or journal.get('apmPackage') != self.apm_package):
             raise RuntimeError('Recovery journal does not match the signed transaction')
         if journal.get('phase') in ('complete', 'rolled-back'):
             raise RuntimeError('This transaction is already complete; refusing to restore a stale profile backup')

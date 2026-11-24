@@ -21,6 +21,48 @@ In-client updates additionally require system Python 3, OpenSSL (`/usr/bin/opens
 
 Use a checkout path without whitespace for GNU make's existing source layout. All commands below start at the repository root.
 
+## Precompiled DEB and APM packages
+
+`Packaging/build_deb.py` builds an amd64 Debian package in the Spark/Deepin
+`/opt/apps/cn.edu.hit.welink.native` layout, with standard desktop/icon entries.
+It consumes a finalized image and the exact verified `image-inputs` directory;
+it does not compile on the end user's machine or require an existing native release.
+
+```sh
+python3 Packaging/build_deb.py \
+  --image "$BUILD/image" --inputs "$BUILD/image-inputs" \
+  --source-commit "$SOURCE_COMMIT" --output "$OUT"
+# Run on a build machine with APM and its amber-pm-bookworm base installed:
+bash Packaging/build_apm.sh \
+  --deb "$OUT/cn.edu.hit.welink.native_45.14-1_amd64.deb" --output "$OUT"
+```
+
+The public seed contains first-party/open-source binaries and minimal adaptation
+recipes. Unchanged proprietary files and provider/model input bytes are references
+to hash-pinned lawful upstream inputs, never literal public payloads. New/changed
+proprietary executables and near-whole upstream replacement literals are rejected.
+Reconstruction must match every sealed image byte, link and executable mode.
+
+The ordinary package uses the existing protected SUID sandbox, installed by dpkg;
+one bounded privileged helper copies only that trusted sandbox to a private user
+staging directory. Neither the full installer nor the application runs as root.
+APM uses Chromium's nested user-namespace sandbox instead, with explicit backend
+validation; inability to create the sandbox is an error, not an unsandboxed retry.
+APM has its own launcher, profile and release directory and must remain inside the
+container for warm activation, URLs, autostart and update/restart.
+
+First user launch asks for upstream-use authorization and can acquire the fixed
+inputs itself. For lawful offline inputs, run `welink-native-setup` with
+`--accept-vendor-terms --vendor-installer FILE --hrtc-bundle FILE
+--background-archive FILE --background-license FILE`; `--no-launch` prepares and
+activates without opening WeLink. Do not run either entry as root. Package removal
+retains user images, profiles and backups rather than walking or deleting homes.
+
+The package manages public bootstrap components; in-client signed updates manage
+the user's application images. Existing running sessions are not terminated by
+package installation or activation. A currently running application must exit
+normally before the package bootstrap can switch its per-user desktop entry.
+
 ## One-command complete image build
 
 Read the [HIT application distribution page](https://app.hit.edu.cn/) and the applicable Huawei/provider terms first. `--accept-vendor-terms` is your explicit confirmation of authorization to obtain and use those inputs, **not** a license grant or a redistribution permission.

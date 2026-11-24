@@ -67,6 +67,22 @@ def emit(args,phase,completed,total,**extra):
     if args.progress_json:
         print(json.dumps(dict(phase=phase,completed=completed,total=total,**extra)),flush=True)
 
+def sandbox_copy(source,destination,expected):
+    fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
+    try:
+        info=os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=0o755:
+            raise RuntimeError('Namespace sandbox payload must be a regular user-owned 0755 file')
+        with os.fdopen(os.dup(fd),'rb') as stream: data=stream.read()
+        if sha(data)!=expected: raise RuntimeError('Namespace sandbox payload bytes changed')
+        target=destination/'chrome-sandbox'
+        with target.open('xb') as stream:
+            stream.write(data)
+            os.fchmod(stream.fileno(),0o755)
+            os.fsync(stream.fileno())
+    finally:
+        os.close(fd)
+
 def sandbox_link(source,destination,expected,args):
     s=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
     d=os.open(destination,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -105,7 +121,9 @@ def verify(root,args):
             if p.is_symlink() or not p.is_file() or sha(p.read_bytes())!=item['sha256']: raise RuntimeError('Wrong image bytes: '+name)
             mode=stat.S_IMODE(p.stat().st_mode)
             if name=='chrome-sandbox':
-                if p.stat().st_uid!=0 or mode!=0o4755: raise RuntimeError('Sandbox must be root-owned 4755')
+                owner=os.getuid() if args.namespace_sandbox else 0
+                required_mode=0o755 if args.namespace_sandbox else 0o4755
+                if p.stat().st_uid!=owner or mode!=required_mode: raise RuntimeError('Sandbox owner/mode differs from the selected backend')
             elif mode!=item['mode']: raise RuntimeError('Wrong file mode: '+name)
         emit(args,'verifying',index,total)
 
@@ -116,13 +134,22 @@ def main():
     parser.add_argument('--install-root',type=Path,help='Private side-by-side release root')
     parser.add_argument('--profile',type=Path,help='Explicit existing native profile')
     parser.add_argument('--preserve-defaults',action='store_true',help='Do not change any desktop/MIME defaults')
-    parser.add_argument('--desktop-id',choices=['hit-welink-native.desktop','cn.edu.hit.welink.native.desktop'])
+    parser.add_argument('--desktop-id',choices=['hit-welink-native.desktop','cn.edu.hit.welink.native.desktop','cn.edu.hit.welink.native.apm.desktop'])
+    parser.add_argument('--namespace-sandbox',action='store_true',help='APM only: retain verified non-setuid payload and require Chromium namespace sandbox')
     parser.add_argument('--progress-json',action='store_true',help='Emit real per-file JSON progress')
     args=parser.parse_args()
+    apm_package=os.environ.get('WELINK_NATIVE_APM_PACKAGE')
+    if args.namespace_sandbox:
+        if (apm_package!='cn.edu.hit.welink.native.apm' or os.environ.get('IS_ACE_ENV')!='1' or
+                os.environ.get('APM_PKG_NAME')!=apm_package):
+            raise RuntimeError('--namespace-sandbox requires the matching Amber PM application context')
+    elif apm_package:
+        raise RuntimeError('APM installation requires the explicit --namespace-sandbox backend')
     os.umask(0o077)
     def interrupted(_signal,_frame): raise InterruptedError('Installation canceled')
     signal.signal(signal.SIGTERM,interrupted)
-    home=Path.home().resolve(); root=(args.install_root or home/'.local/opt').absolute()
+    home=Path.home().resolve()
+    root=(args.install_root or home/('.local/opt/hit-welink-native-apm' if args.namespace_sandbox else '.local/opt')).absolute()
     old=(args.base_image or root/metadata['base']/'image').absolute(); dest=root/metadata['release']
     if not root.is_dir() or root.resolve()!=root or root.stat().st_uid!=os.getuid():
         raise RuntimeError('Installation root must be a user-owned real directory')
@@ -143,7 +170,10 @@ def main():
                 target.parent.mkdir(parents=True,exist_ok=True)
                 if target.parent.resolve()!=target.parent: raise RuntimeError('Output traverses a symlink: '+name)
                 if name=='chrome-sandbox':
-                    sandbox_link(old/name,image,item['sha256'],args)
+                    if args.namespace_sandbox:
+                        sandbox_copy(old/name,image,item['sha256'])
+                    else:
+                        sandbox_link(old/name,image,item['sha256'],args)
                 elif 'link' in item:
                     target.symlink_to(item['link'])
                 else:
@@ -174,6 +204,7 @@ def main():
         if not integration.is_file() or sha(integration.read_bytes())!=metadata['desktopInstallerSha256']:
             raise RuntimeError('Desktop installer missing or changed')
         command=[os.sys.executable,str(integration),'--image',str(dest/'image'),'--profile',str(args.profile)]
+        if args.namespace_sandbox: command.extend(['--apm-package',apm_package])
         if args.preserve_defaults: command.append('--preserve-defaults')
         if args.desktop_id: command.extend(['--desktop-id',args.desktop_id])
         subprocess.run(command,check=True)

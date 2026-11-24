@@ -22,16 +22,24 @@ function execArgument(value) {
 }
 
 function createAutostart({ app, appRoot, profileRoot, execPath }) {
+  const apmPackage = process.env.WELINK_NATIVE_APM_PACKAGE || null;
+  if (apmPackage && (apmPackage !== 'cn.edu.hit.welink.native.apm' ||
+      process.env.IS_ACE_ENV !== '1' || process.env.APM_PKG_NAME !== apmPackage))
+    throw failure('EINVAL', 'The APM autostart context is not an active Amber PM application.');
   const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath('home'), '.config');
   if (!path.isAbsolute(configHome)) throw failure('EINVAL', 'XDG_CONFIG_HOME must be absolute');
-  const id = 'cn.edu.hit.welink.native-' + crypto.createHash('sha256').update(profileRoot).digest('hex').slice(0, 16);
+  const id = (apmPackage || 'cn.edu.hit.welink.native') + '-' + crypto.createHash('sha256').update(profileRoot).digest('hex').slice(0, 16);
   const directory = path.join(configHome, 'autostart');
   const filename = path.join(directory, id + '.desktop');
   const marker = 'X-WeLink-Native-Owner=' + id;
+  const launcher = apmPackage ? path.join(app.getPath('home'), '.local/bin/hit-welink-native-apm') : execPath;
+  const command = apmPackage ? '/bin/bash -- ' + execArgument(launcher) :
+    'env ' + execArgument('WELINK_NATIVE_PROFILE_DIR=' + profileRoot) + ' ' +
+    execArgument(execPath) + ' ' + execArgument(appRoot);
   const content = '[Desktop Entry]\nType=Application\nVersion=1.0\nName=' + desktopValue(app.getName()) +
-    '\nExec=env ' + execArgument('WELINK_NATIVE_PROFILE_DIR=' + profileRoot) + ' ' +
-    execArgument(execPath) + ' ' + execArgument(appRoot) +
-    '\nTryExec=' + desktopValue(execPath) + '\nTerminal=false\nStartupNotify=true\n' + marker +
+    '\nExec=' + command + '\nTryExec=' + desktopValue(launcher) +
+    '\nTerminal=false\nStartupNotify=true\n' + marker +
+    (apmPackage ? '\nX-WeLink-Native-APM-Package=' + apmPackage : '') +
     '\nX-WeLink-Native-Profile=' + desktopValue(profileRoot) + '\n';
 
   function openOwned(flags) {
