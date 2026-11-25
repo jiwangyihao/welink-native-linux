@@ -2,7 +2,8 @@
  * Build (JSON_C_PREFIX MUST be the supplied private ia32 json-c 0.19 install):
  * cc -m32 -std=c11 -O2 -Wall -Wextra -Werror -pthread \
  *   -I"$JSON_C_PREFIX/include" analysis/onebox_native_validation.c \
- *   "$JSON_C_PREFIX/lib/libjson-c.a" -ldl -lm -o "$HELPER"
+ *   "$JSON_C_PREFIX/lib/libjson-c.a" -ldl -lm \
+ *   -Wl,--export-dynamic-symbol=g_get_monotonic_time -o "$HELPER"
  * The Python fixture supplies a private log directory and JSON-lines controls.
  * stdout is JSON-lines evidence; callback.raw preserves the exact SDK frame.
  * Never dlclose: the public shutdown API intentionally leaves cleanup to workers.
@@ -37,6 +38,7 @@ static void (*shutdown_service)(void);
 static pthread_t owner;
 static pthread_mutex_t output_mutex = PTHREAD_MUTEX_INITIALIZER;
 static atomic_uint callbacks, violations;
+static atomic_uint elapsed_seconds;
 static atomic_int in_pump, stopped = 1;
 static unsigned epoch;
 static _Thread_local unsigned depth;
@@ -87,6 +89,13 @@ static int64_t now_ns(void)
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts)) _exit(70);
     return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
+}
+
+/* Advance only the SDK's monotonic clock; TLS, HTTP and driver deadlines remain
+ * real. Export this symbol from the helper, never from a production SDK build. */
+int64_t g_get_monotonic_time(void)
+{
+    return now_ns() / 1000 + (int64_t)atomic_load(&elapsed_seconds) * 1000000;
 }
 
 static struct json_object *parse(const char *text)
@@ -261,6 +270,11 @@ int main(int argc, char **argv)
             int error = pthread_create(&thread, NULL, wrong_thread, &rc);
             if (error) rc = -error;
             else if ((error = pthread_join(thread, NULL))) rc = -error;
+        } else if (!strcmp(op, "advance")) {
+            int64_t seconds = integer(control, "seconds", -1);
+            unsigned elapsed = atomic_load(&elapsed_seconds);
+            if (seconds < 0 || seconds > 86400 - elapsed) rc = -EINVAL;
+            else atomic_store(&elapsed_seconds, elapsed + (unsigned)seconds);
         } else if (!strcmp(op, "observe")) {
             int64_t ms = integer(control, "milliseconds", 0);
             if (ms < 0 || ms > 2000) rc = -EINVAL;

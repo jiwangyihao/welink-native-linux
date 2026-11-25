@@ -9,7 +9,8 @@ Parent compile, from MessagingFiles (JSON_C_PREFIX is the supplied private ia32
 0.19 installation; HELPER is a new output path):
   cc -m32 -std=c11 -O2 -Wall -Wextra -Werror -pthread \\
     -I"$JSON_C_PREFIX/include" analysis/onebox_native_validation.c \\
-    "$JSON_C_PREFIX/lib/libjson-c.a" -ldl -lm -o "$HELPER"
+    "$JSON_C_PREFIX/lib/libjson-c.a" -ldl -lm \\
+    -Wl,--export-dynamic-symbol=g_get_monotonic_time -o "$HELPER"
 Parent run, after restoring the client and building the SDK separately:
   unshare --user --map-root-user --net sh -c \\
     'ip link set lo up; exec python3 "$1" --helper "$2" --native-so "$3" --output "$4"' \\
@@ -25,6 +26,7 @@ strings, decrypted HTTP headers/bodies, received parts, reconstructed commits,
 input/output hashes, commands, timings and separate protocol/lifecycle results.
 """
 import argparse
+import base64
 import hashlib
 import http.server
 import json
@@ -52,6 +54,7 @@ ACCESS = "native-validation-access-token"
 TOKEN = "native-validation-onebox-token"
 REFRESH = "native-validation-refresh-token"
 NONBLOCK_NS = 750_000_000
+PLAIN_ACCESS = "native-validation-link-access"
 SSO = {"token": TOKEN, "refreshToken": REFRESH, "timeout": 3600,
        "cloudUserId": 42,  # Valid Onebox sessions need not include the directory attribute objectSid.
        "loginName": "native-validation-user42"}
@@ -194,6 +197,10 @@ class Fixture:
         self.lock = threading.Lock()
         self.active = 0
         self.login_done = threading.Event()
+        self.renewal_done = threading.Event()
+        self.sso = dict(SSO)
+        self.renewal_response = None
+        self.download_token = TOKEN
         self.gates = {name: threading.Event() for name in ("cancel", "shutdown")}
         self.started = {name: threading.Event() for name in ("cancel", "shutdown")}
         self.backend = {
@@ -329,14 +336,34 @@ class Fixture:
                 if path == "/api/v2/sso/welink":
                     require(self.command == "GET" and not query and not self.body, "unexpected SSO method/body")
                     require(self.headers.get("x-access-token") == ACCESS, "unexpected SSO token")
-                    self.json_reply(200, SSO)
+                    fixture.download_token = fixture.sso["token"]
+                    self.json_reply(200, fixture.sso)
                     fixture.login_done.set()
                     return
+                if path == "/api/v2/token":
+                    require(self.command == "PUT" and not query and not self.body,
+                            "unexpected renewal method/body")
+                    self.auth(token=REFRESH)
+                    if fixture.renewal_response is None:
+                        self.json_reply(503, {"error": "synthetic-renewal-unavailable"})
+                    else:
+                        fixture.download_token = fixture.renewal_response["token"]
+                        self.json_reply(200, fixture.renewal_response)
+                    fixture.renewal_done.set()
+                    return
                 if path.startswith("/download/"):
-                    self.auth(user=True)
-                    require(self.command == "GET" and not query and not self.body, "unexpected download request")
+                    self.auth(token=fixture.download_token, user=True)
+                    require(not query, "unexpected download query")
                     mode = path.rsplit("/", 1)[1]
-                    require(mode in ("full", "range", "ignored", "partial", "complete", "cancel", "shutdown"),
+                    if mode == "received":
+                        date = self.headers.get("Date")
+                        require(self.command == "POST" and date, "received link requires a dated signed POST")
+                        signature = base64.b64encode(hashlib.sha256(
+                            (PLAIN_ACCESS + "_sep_" + date).encode("ascii")).hexdigest().encode("ascii")).decode("ascii")
+                        require(self.object_body() == {"plainAccessCode": signature}, "wrong received-link signature")
+                    else:
+                        require(self.command == "GET" and not self.body, "unexpected download request")
+                    require(mode in ("full", "range", "ignored", "partial", "complete", "cancel", "shutdown", "received"),
                             "unknown synthetic download")
                     require(mode != "complete", "complete local file must skip its body request")
                     offset = PREFIX if mode in ("range", "ignored", "partial") else 0
@@ -819,6 +846,104 @@ def download_case(driver, fixture, mode, sno):
     return result
 
 
+def received_download(driver, fixture, sno, name):
+    destination = driver.root / (name + ".bin")
+    message = download_request(sno, destination, fixture.origin, "received", resume=False)
+    message["param"]["down_file_info"]["pplain_access"]["access_code"] = PLAIN_ACCESS
+    driver.send(message)
+    handle, ack = initial_handle(driver, DOWNLOAD, sno)
+    completed = assert_completion(driver, handle, ack)
+    return {"ack": ack["frame"], "completion": completed["frame"],
+            "bytes": byte_report(destination, fixture.download)}
+
+
+def session_barrier(driver, sno):
+    # Wake the idle worker after advancing its clock. A second request after
+    # the fixture replies is a queue barrier behind the actual renewal.
+    driver.send(request(UPDATE, sno, {"access_token": ACCESS}, "tup_offlinefile_update_token"))
+    require(driver.reply(UPDATE, sno)["frame"].get("result") == 0, "session update barrier failed")
+
+
+def renewal_case(driver, fixture, certificate, sno):
+
+    require(not fixture.renewal_done.is_set(), "renewal fixture must begin with a fresh session")
+    driver.ok("advance", seconds=SSO["timeout"] - 119)
+    session_barrier(driver, sno)
+    require(fixture.renewal_done.wait(12), "SDK did not perform the due renewal; rebuild the clock-enabled helper")
+    session_barrier(driver, sno + 1)
+    renewals = [frame for frame in fixture.frames if frame["path"] == "/api/v2/token"]
+    require(renewals and all(frame.get("status") == 503 for frame in renewals),
+            "expected a genuine HTTPS renewal failure")
+    accepted = received_download(driver, fixture, sno + 2, "received-after-failed-renewal")
+
+    driver.ok("advance", seconds=121)
+    session_barrier(driver, sno + 3)
+    before = fixture.paths().count("/download/received")
+    expired_path = driver.root / "received-after-expiry.bin"
+    driver.send(download_request(sno + 4, expired_path, fixture.origin, "received", resume=False))
+    expired = driver.reply(DOWNLOAD, sno + 4)["frame"]
+    require(expired.get("result") == BASE + 30 and not expired_path.exists(),
+            "expired session must refuse the download before creating a file")
+    require(fixture.paths().count("/download/received") == before, "expired session sent a download request")
+    require(len([frame for frame in fixture.frames if frame["path"] == "/api/v2/token"]) == len(renewals),
+            "failed renewal spun or extended the original grant")
+
+    login(driver, fixture, certificate, sno + 5)
+    restored = received_download(driver, fixture, sno + 6, "received-after-relogin")
+    return {"renewal_status": 503, "renewal_attempts": len(renewals), "unexpired_download": accepted,
+            "expired_download": expired, "relogin_download": restored}
+
+
+def renewal_boundary_case(driver, fixture, certificate, sno):
+    results = []
+    try:
+        for index, lifetime in enumerate((600, 60)):
+            serial = sno + index * 10
+            fixture.sso = dict(SSO, timeout=lifetime)
+            fixture.renewal_response = {"token": TOKEN + "-renewed-" + str(lifetime),
+                                        "refreshToken": REFRESH, "tokenType": "Bearer", "timeout": 3600}
+            fixture.renewal_done.clear()
+            login(driver, fixture, certificate, serial)
+            sso_count = fixture.paths().count("/api/v2/sso/welink")
+            before = len(fixture.frames)
+            expired = None
+            if lifetime < 600:
+                # The original minimum renewal timer is 600 seconds, independent
+                # of a shorter access grant. Expiry must not cancel that timer.
+                driver.ok("advance", seconds=lifetime + 1)
+                session_barrier(driver, serial + 1)
+                expired_path = driver.root / "short-grant-expired.bin"
+                driver.send(download_request(serial + 2, expired_path, fixture.origin, "received", resume=False))
+                expired = driver.reply(DOWNLOAD, serial + 2)["frame"]
+                require(expired.get("result") == BASE + 30 and not expired_path.exists(),
+                        "short grant authorized a download after expiry")
+                require(not any(frame["path"] in ("/download/received", "/api/v2/token")
+                                for frame in fixture.frames[before:]),
+                        "expired short grant used HTTP or renewed before the minimum timer")
+                driver.ok("advance", seconds=600 - lifetime)
+            else:
+                driver.ok("advance", seconds=601)
+            session_barrier(driver, serial + 3)
+            require(fixture.renewal_done.wait(12), "access-token expiry cancelled the due refresh-token attempt")
+            session_barrier(driver, serial + 4)
+            renewals = [frame for frame in fixture.frames[before:] if frame["path"] == "/api/v2/token"
+                        and not frame.get("routing_failure")]
+            require(len(renewals) == 1 and renewals[0].get("status") == 200,
+                    "boundary renewal did not obtain exactly one new grant")
+            # The server now accepts only the new token; reusing the expired
+            # grant fails authentication even if the client reports a handle.
+            downloaded = received_download(driver, fixture, serial + 5, "renewed-" + str(lifetime))
+            require(fixture.paths().count("/api/v2/sso/welink") == sso_count,
+                    "boundary recovery required an unexpected SSO login")
+            results.append({"lifetime": lifetime, "expired_download": expired, "renewal_status": 200,
+                            "renewed_download": downloaded})
+    finally:
+        fixture.sso = dict(SSO)
+        fixture.renewal_response = None
+        login(driver, fixture, certificate, sno + 20)
+    return results
+
+
 def upload_case(driver, fixture, mode, sno):
     group = mode == "group_resume"
     before = len(fixture.frames)
@@ -1112,6 +1237,8 @@ def main():
     parser.add_argument("--library-dir", type=Path, action="append", default=[], help="explicit private ia32 dependency directory (repeatable)")
     parser.add_argument("--routing", action="store_true",
                         help="force verified Compass/standby TLS, partial-download rollback and upload replay")
+    parser.add_argument("--renewal-only", action="store_true",
+                        help="only failed/expiry-boundary renewals and authenticated received-file downloads")
     options = parser.parse_args()
     os.umask(0o077)
     options.output.mkdir(parents=True, exist_ok=True)
@@ -1136,10 +1263,13 @@ def main():
             protocol_driver = Driver(options, root, "protocol-driver")
             protocol_driver.ok("init")
             login(protocol_driver, fixture, ca, 1)
-            cases = [(mode, lambda mode=mode, sno=10 + n * 10: download_case(protocol_driver, fixture, mode, sno))
-                     for n, mode in enumerate(("full", "range", "ignored", "partial", "complete"))]
-            cases.extend((mode, lambda mode=mode, sno=100 + n * 10: upload_case(protocol_driver, fixture, mode, sno))
-                         for n, mode in enumerate(("multipart", "dedup", "group_resume")))
+            cases = [("failed-renewal-download", lambda: renewal_case(protocol_driver, fixture, ca, 7000)),
+                     ("expiry-boundary-renewal", lambda: renewal_boundary_case(protocol_driver, fixture, ca, 7100))]
+            if not options.renewal_only:
+                cases.extend((mode, lambda mode=mode, sno=10 + n * 10: download_case(protocol_driver, fixture, mode, sno))
+                             for n, mode in enumerate(("full", "range", "ignored", "partial", "complete")))
+                cases.extend((mode, lambda mode=mode, sno=100 + n * 10: upload_case(protocol_driver, fixture, mode, sno))
+                             for n, mode in enumerate(("multipart", "dedup", "group_resume")))
             for name, run in cases:
                 start = time.monotonic()
                 try:
@@ -1148,7 +1278,7 @@ def main():
                 except ProtocolFailure as error:
                     report["protocol"].append({"case": name, "passed": False, "error": str(error)})
                 save_json(root / "report.json", report)
-            if options.routing:
+            if options.routing and not options.renewal_only:
                 try:
                     details = routing_result(fixture)
                     report["protocol"].append({"case": "route-failover", "passed": True, "details": details})
@@ -1164,26 +1294,27 @@ def main():
                 report["lifecycle"].append({"case": "protocol-driver-cleanup", "passed": error is None, "error": error})
         # Separate process and outcomes: a protocol failure does not suppress the
         # owner/cancellation/shutdown exercises and a shutdown failure is not SSO.
-        try:
-            lifecycle_driver = Driver(options, root, "lifecycle-driver")
-            lifecycle_driver.ok("init")
-            details = lifecycle_cases(lifecycle_driver, fixture, ca)
-            report["lifecycle"].append({"case": "owner-cancel-shutdown-reinit", "passed": True, "details": details})
-        except (LifecycleFailure, ProtocolFailure) as error:
-            category = "lifecycle" if isinstance(error, LifecycleFailure) else "protocol"
-            report[category].append({"case": "owner-cancel-shutdown-reinit", "passed": False, "error": str(error)})
-        finally:
-            for gate in fixture.gates.values():
-                gate.set()
-            if lifecycle_driver:
-                error = lifecycle_driver.close()
-                report["lifecycle"].append({"case": "lifecycle-driver-cleanup", "passed": error is None, "error": error})
-        try:
-            details = proxy_tls_failure_case(options, root, ca, certificate, key)
-            report["protocol"].append({"case": "connect-success-origin-tls-failure", "passed": True, "details": details})
-        except (LifecycleFailure, ProtocolFailure) as error:
-            category = "lifecycle" if isinstance(error, LifecycleFailure) else "protocol"
-            report[category].append({"case": "connect-success-origin-tls-failure", "passed": False, "error": str(error)})
+        if not options.renewal_only:
+            try:
+                lifecycle_driver = Driver(options, root, "lifecycle-driver")
+                lifecycle_driver.ok("init")
+                details = lifecycle_cases(lifecycle_driver, fixture, ca)
+                report["lifecycle"].append({"case": "owner-cancel-shutdown-reinit", "passed": True, "details": details})
+            except (LifecycleFailure, ProtocolFailure) as error:
+                category = "lifecycle" if isinstance(error, LifecycleFailure) else "protocol"
+                report[category].append({"case": "owner-cancel-shutdown-reinit", "passed": False, "error": str(error)})
+            finally:
+                for gate in fixture.gates.values():
+                    gate.set()
+                if lifecycle_driver:
+                    error = lifecycle_driver.close()
+                    report["lifecycle"].append({"case": "lifecycle-driver-cleanup", "passed": error is None, "error": error})
+            try:
+                details = proxy_tls_failure_case(options, root, ca, certificate, key)
+                report["protocol"].append({"case": "connect-success-origin-tls-failure", "passed": True, "details": details})
+            except (LifecycleFailure, ProtocolFailure) as error:
+                category = "lifecycle" if isinstance(error, LifecycleFailure) else "protocol"
+                report[category].append({"case": "connect-success-origin-tls-failure", "passed": False, "error": str(error)})
     except Exception as error:
         report["setup"].append({"passed": False, "error": type(error).__name__ + ": " + str(error)})
     finally:

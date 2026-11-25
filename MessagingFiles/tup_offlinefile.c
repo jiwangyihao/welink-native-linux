@@ -40,7 +40,7 @@ struct http_origin {
 struct onebox_session {
     struct json_object *configuration;
     char *token, *refresh_token, *user_id;
-    gint64 renewal_at;
+    gint64 renewal_at, expires_at;
     struct http_origin origin;
     struct ls_http_context http;
 };
@@ -96,7 +96,15 @@ static void clear_session(void)
     clear_secret(&session.user_id);
     json_object_put(session.configuration);
     session.configuration = NULL;
-    session.renewal_at = 0;
+    session.renewal_at = session.expires_at = 0;
+}
+
+static void expire_session(gint64 now)
+{
+    if (session.expires_at && now >= session.expires_at) {
+        clear_secret(&session.token);
+        session.expires_at = 0;
+    }
 }
 
 static struct json_object *reason_value(const char *reason)
@@ -451,24 +459,29 @@ static int store_login_response(const struct http_response *response,
     session.token = new_token;
     session.refresh_token = new_refresh;
     session.user_id = new_user;
-    /* Original refresh timer: timeout > 600 ? timeout - 120 : 600 seconds. */
+    gint64 now = g_get_monotonic_time();
+    session.expires_at = timeout > (G_MAXINT64 - now) / G_USEC_PER_SEC ? G_MAXINT64 :
+        now + timeout * G_USEC_PER_SEC;
+    /* Original refresh timer: timeout > 600 ? timeout - 120 : 600 seconds.
+     * A proactive renewal is not the expiry of the current access token. */
     int64_t interval = timeout > 600 ? timeout - 120 : 600;
-    if (interval > G_MAXINT64 / G_USEC_PER_SEC - g_get_monotonic_time() / G_USEC_PER_SEC)
-        interval = 600;
-    session.renewal_at = g_get_monotonic_time() + interval * G_USEC_PER_SEC;
+    if (interval > (G_MAXINT64 - now) / G_USEC_PER_SEC) interval = 600;
+    session.renewal_at = now + interval * G_USEC_PER_SEC;
     json_object_put(root);
     return 0;
 }
 
 static int refresh_session(void)
 {
-    if (!session.token || !session.refresh_token || !session.configuration) return OFF_NOT_LOGIN;
+    /* Consume the timer even on failure. Only a successful response schedules
+     * another renewal; neither failure nor access-token expiry revokes the
+     * independent refresh credential or extends the current access grant. */
+    session.renewal_at = 0;
+    if (!session.refresh_token || !session.configuration) return OFF_NOT_LOGIN;
     struct curl_slist *headers = NULL;
     if (!add_header(&headers, "Authorization", session.refresh_token) ||
         !add_header(&headers, "Content-Type", "application/json")) {
         curl_slist_free_all(headers);
-        clear_secret(&session.token);
-        session.renewal_at = 0;
         return OFF_INVALID_PARAM;
     }
     char *url = endpoint(session.configuration, "/api/v2/token");
@@ -478,11 +491,6 @@ static int refresh_session(void)
     g_free(url);
     if (!result) result = store_login_response(&response, session.configuration, TRUE);
     g_string_free(response.body, TRUE);
-    if (result) {
-        /* Do not manufacture a renewal. The next request tells JS to re-login. */
-        clear_secret(&session.token);
-        session.renewal_at = 0;
-    }
     return result;
 }
 
@@ -764,13 +772,13 @@ static gpointer offline_worker(gpointer unused)
 {
     (void)unused;
     while (!g_atomic_int_get(&stopping)) {
-        gpointer item;
-        if (session.renewal_at) {
-            gint64 remaining = session.renewal_at - g_get_monotonic_time();
-            if (remaining <= 0) { refresh_session(); continue; }
-            item = g_async_queue_timeout_pop(requests, remaining);
-            if (!item) { refresh_session(); continue; }
-        } else item = g_async_queue_pop(requests);
+        gint64 now = g_get_monotonic_time();
+        expire_session(now);
+        if (session.renewal_at && session.renewal_at <= now) { refresh_session(); continue; }
+        gint64 deadline = session.renewal_at;
+        if (session.expires_at && (!deadline || session.expires_at < deadline)) deadline = session.expires_at;
+        gpointer item = deadline ? g_async_queue_timeout_pop(requests, deadline - now) : g_async_queue_pop(requests);
+        if (!item) continue;
         if (item == &shutdown_marker) break;
         struct offline_job *job = item;
         if (g_atomic_int_get(&stopping)) {
@@ -778,6 +786,9 @@ static gpointer offline_worker(gpointer unused)
             g_free(job);
             break;
         }
+        /* Queue wakeups may race expiry; do not dispatch a new transfer with
+         * a grant that expired while the worker was waiting. */
+        expire_session(g_get_monotonic_time());
         struct native_request *request = &job->request;
         switch (request->cmd) {
         case 589828: transfer_cancel_all(); login_command(request); break;
