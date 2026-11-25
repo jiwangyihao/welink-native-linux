@@ -2060,10 +2060,10 @@
     },
     "plugin/conference/dist/js/hwmService.js": {
       "baseSha256": "14f333c2706b32b39e0729e76d0ed87921b07e6fef59ccc728391e64fb74b515",
-      "targetSha256": "320046da545a5a028af7dc129749f8e7e056d3afc93f83c9f896198288833b37",
-      "targetSize": 545524,
+      "targetSha256": "7a5a41ecadb2861a318be6e1644a839d3a8e9fa666dc21ef700daa33cd82dd44",
+      "targetSize": 545533,
       "mode": 420,
-      "literalBytes": 4663,
+      "literalBytes": 4672,
       "operations": [
         [
           "copy",
@@ -2099,7 +2099,7 @@
         ],
         [
           "data",
-          "KHdpbmRvdy5yZXF1aXJlKCJvcyIpLnBsYXRmb3JtKCk9PT0ibGludXgiJiZ0eXBlb2YgdC5pc090aGVyQ29ycENvbmYhPT0iYm9vbGVhbiI/aS5kZWZhdWx0LnNldFNoYXJlU2NyZWVuUGVybWlzc2lvbihmYWxzZSk6T2JqZWN0KHIuYSkoe01lZXRpbmdoYXJlOl8saXNPdGhlckNvcnBDb25mOm51bGw9PXQ/dm9pZCAwOnQuaXNPdGhlckNvcnBDb25mfSkpLGkuZGVmYXVsdC5jYWxsT3RoZXI="
+          "KHdpbmRvdy5yZXF1aXJlKCJvcyIpLnBsYXRmb3JtKCk9PT0ibGludXgiJiZ0eXBlb2YgdC5pc090aGVyQ29ycENvbmYhPT0iYm9vbGVhbiI/aS5kZWZhdWx0LnNldFNoYXJlU2NyZWVuUGVybWlzc2lvbihmYWxzZSk6T2JqZWN0KHIuYSkoeyJNZWV0aW5nXHUwMDI0U2hhcmUiOl8saXNPdGhlckNvcnBDb25mOm51bGw9PXQ/dm9pZCAwOnQuaXNPdGhlckNvcnBDb25mfSkpLGkuZGVmYXVsdC5jYWxsT3RoZXI="
         ],
         [
           "copy",

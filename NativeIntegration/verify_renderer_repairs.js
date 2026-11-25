@@ -101,6 +101,60 @@ async function imCases(directory) {
   assert.equal(broadcast, 3, 'Missing box list must not abort unread refresh');
   ++groups;
 }
+async function sharingPolicyCases() {
+  const bundle = source('plugin/conference/dist/js/hwmService.js');
+  const name = property => property.key && (property.key.name || property.key.value);
+  const policyExpression = bundle.one(node => node.type === 'ArrowFunctionExpression' && node.async &&
+    node.params[0]?.type === 'ObjectPattern' && node.params[0].properties.some(property => name(property) === 'Meeting$Share'));
+  const consumerExpression = bundle.one(node => node.type === 'ArrowFunctionExpression' && node.async &&
+    node.params.length === 1 && node.body.type === 'BlockStatement' &&
+    node.body.body.some(statement => statement.type === 'VariableDeclaration' &&
+      statement.declarations.some(declaration => declaration.id.type === 'ObjectPattern' &&
+        declaration.id.properties.some(property => name(property) === 'permissionConfig'))));
+  const cases = [
+    { label: 'external enterprise denied', relation: true, setting: '0', usg: true, expected: false },
+    { label: 'external enterprise allowed', relation: true, setting: '1', usg: true, expected: true },
+    { label: 'same enterprise retains original policy', relation: false, setting: '0', usg: true, expected: true },
+    { label: 'unknown enterprise remains denied', setting: '1', usg: true, expected: false },
+    { label: 'anonymous sharing denial retained', relation: false, setting: '1', usg: false, anonymousDenied: true, expected: false },
+    { label: 'anonymous allowed policy retained', relation: false, setting: '1', usg: false, expected: true }
+  ];
+  for (const test of cases) {
+    const decisions = [], pending = [], values = new Map([['isUsgEnable', test.usg]]);
+    const store = { getStore: key => values.get(key), setStore: (key, value) => values.set(key, value) };
+    const logger = { info() {}, debug() {} };
+    const api = {
+      setShareScreenPermission(value) { assert.equal(typeof value, 'boolean'); decisions.push(value); return Promise.resolve({ result: 0 }); },
+      callOtherNumBtnConfigUISdk() {}, sendUpdateOneRoomConfigUISdk() {}
+    };
+    const Pedestal = {
+      async callMethod(method, query) {
+        if (method === 'method://conference/getConfTenantConfig') return {
+          confConfig: { isOneRoomType: 0, meetingExtNoticeSwitch: '0' },
+          permissionConfig: { 'Meeting$Share': test.setting }
+        };
+        assert.equal(method, 'method://private_conference/publicQueryDB');
+        assert.equal(query, 'meetingAnoShareList');
+        return JSON.stringify(test.anonymousDenied ? [{ switch: '0' }] : []);
+      },
+      sendBroadcast() {}
+    };
+    const policy = evaluate(policyExpression, { o: { a: store }, d: logger, Pedestal,
+      isNullOrEmpty: value => value == null || value === '', s: { default: api } });
+    const consumer = evaluate(consumerExpression, { g: logger, o: { a: value => value }, a: store, Pedestal,
+      window: { require(module) { assert.equal(module, 'os'); return { platform: () => 'linux' }; } },
+      i: { default: api }, r: { a: params => { const result = policy(params); pending.push(result); return result; },
+        c() { throw new Error('Unexpected extended-meeting notification'); } } });
+    const detail = { conf_id: 'private-room', displayConferenceId: 'public-room',
+      guest_join_uri: 'https://meeting.invalid/#/j/12345', conf_subject: 'Policy regression', role: 0 };
+    if (test.relation !== undefined) detail.isOtherCorpConf = test.relation;
+    await consumer({ detail });
+    await Promise.all(pending);
+    assert.deepEqual(decisions, [test.expected], test.label);
+  }
+  ++groups;
+}
+
 async function linkCase(relative) {
   const bundle = source(relative);
   const fn = bundle.one((node, text) => /FunctionExpression$/.test(node.type) && text.includes('queryWebDefaultValue') && text.includes('openMessageLink') && !text.includes('__esModule'));
@@ -176,6 +230,7 @@ async function surfaceCases() {
 }
 (async () => {
   let surface;
+  await sharingPolicyCases();
   if (ui) surface = await surfaceCases();
   else {
     for (const directory of ['pedestal/im/static/js', 'plugin/im/dist/im/static/js']) {
