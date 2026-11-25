@@ -250,7 +250,7 @@
       "Depends": "libc6 (= 2.41-12+deb13u4), libc-dev-bin (= 2.41-12+deb13u4), linux-libc-dev, libcrypt-dev, rpcsvc-proto",
       "Filename": "pool/main/g/glibc/libc6-dev_2.41-12+deb13u4_i386.deb",
       "SHA256": "53dae947b759288f7f1e858a7eec6c3c00adf50317c674515c2a9d2399681bb0",
-      "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6-dev_2.41-12+deb13u4_i386.deb"
+      "url": "https://snapshot.debian.org/file/1dce79acd2b4db9c523f9a807f37a0c4bddbbf74"
     },
     {
       "Package": "libcom-err2",
@@ -716,7 +716,7 @@
       "Depends": "libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libgssapi-krb5-2 (>= 1.17), libgssrpc4t64 (>= 1.6.dfsg.2), libk5crypto3 (>= 1.6.dfsg.2), libkrb5-3 (>= 1.15~beta1), libkrb5support0 (= 1.21.3-5+deb13u1)",
       "Filename": "pool/main/k/krb5/libkadm5clnt-mit12_1.21.3-5+deb13u1_i386.deb",
       "SHA256": "7f3608f445d9ba635ff632d1bd819c0beb3142fafb1dc09a4b9ce267cef606c4",
-      "url": "https://deb.debian.org/debian-security/pool/updates/main/k/krb5/libkadm5clnt-mit12_1.21.3-5+deb13u1_i386.deb"
+      "url": "https://snapshot.debian.org/file/451f5e76b16023e487034813703c6d6d9da603f5"
     },
     {
       "Package": "libkadm5srv-mit12",
