@@ -216,7 +216,7 @@
         Object.defineProperty(stream, name, { configurable: true, writable: true, value: fn });
       }
       function interrupt(reason, restore, skipTrack) {
-        return current?.stream === stream ? stopNow(reason, restore, skipTrack) : Promise.resolve();
+        return current?.stream === stream ? stopNow(reason, restore, skipTrack) : null;
       }
       function stopSources() {
         if (current?.stream !== stream) return;
@@ -235,9 +235,13 @@
         try { return guard.original.close.apply(this, args); }
         finally { if (video) interrupt('BACKGROUND_CAMERA_CLOSED', false); }
       });
-      wrap('removeTrack', async function (track, ...args) {
-        if (track?.kind === 'video') await interrupt('BACKGROUND_CAMERA_REPLACED', true, track);
-        return guard.original.removeTrack.call(this, track, ...args);
+      wrap('removeTrack', function (track, ...args) {
+        // Provider 491 polls getVideoTrack after sdkWrapper(removeTrack), which
+        // does not await the returned promise. Preserve HRTC's synchronous
+        // detach before waiting for publication or background cleanup.
+        const retirement = track?.kind === 'video' ? interrupt('BACKGROUND_CAMERA_REPLACED', true, track) : null;
+        const removal = guard.original.removeTrack.call(this, track, ...args);
+        return retirement ? Promise.all([removal, retirement]).then(([result]) => result) : removal;
       });
       wrap('replaceTrack', async function (track, type, ...args) {
         if (type === 'video') await interrupt('BACKGROUND_CAMERA_REPLACED', true);

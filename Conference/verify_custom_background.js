@@ -206,6 +206,15 @@ async function verifyCustomBackground({ electron, native = __dirname,
       const revoked=sender.track;await background.configure(false);await frames();
       assert(revoked.readyState==='ended'&&sender.track?.readyState==='live','Capability revoke did not restore authorized original camera');
       assert(!background.state().enabled&&!background.state().imported&&!background.state().activeFrames,'Capability revoke retained owned state');
+      // The ordinary provider camera-off consumer calls removeTrack through
+      // its synchronous sdkWrapper and immediately polls getVideoTrack again.
+      // Inactive background guards must retain that observable SDK contract.
+      const beforeCameraOff=sender.track, cameraOff=stream.removeTrack(beforeCameraOff);
+      assert(stream.getVideoTrack()===null&&beforeCameraOff.readyState==='ended',
+        'Camera-off consumer still sees the removed track before the SDK promise settles');
+      await cameraOff;
+      assert(sender.track===null&&!background.state().activeFrames,'Camera-off retained the actual outgoing sender');
+      await stream.addTrack(inputTrack.clone(),profileId);stream.unmuteVideo();
       await background.configure(true);await background.importImage(makeImport('rgb(15,40,225)'));await background.apply();
       await until(()=>background.state().activeFrames,'final session-owned activation');
       const oldOwner=sender.track;sessionKey='qa-replacement-owner';background.pulse();
@@ -220,6 +229,7 @@ async function verifyCustomBackground({ electron, native = __dirname,
         recipientFramesDecoded:decodedReport.framesDecoded,generatedSourceFrames:draws,
         closedCameraUnchanged:true,unpermittedCameraUnchanged:true,forcedPolicyRefused:true,
         replacementImageReceived:true,replacementTrackRetired:true,capabilityRevocationRestored:true,
+        cameraRemovalSynchronous:true,cameraOffSenderReleased:true,
         sessionReplacementRevoked:true,assetRequests,providerAuthorizationTested:false};
       await window.__qaBackgroundCleanup();delete window.__qaBackgroundCleanup;
       return report;

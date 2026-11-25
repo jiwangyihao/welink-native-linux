@@ -161,22 +161,18 @@ if [[ $suite == custom-background ]]; then
 fi
 # No current-native overlay: every production module/worker/library is IMAGE.
 # The sealed image root is private (0700); do not change its owner or mode.
-# Give this namespace its own traversable root with read-only image children.
+# Use a private readable copy: full_build deliberately creates 0700 directories.
+# Source image bytes, ownership and modes remain untouched.
 mount -t tmpfs -o mode=0755,nodev tmpfs "$work/runtime"
-for src in "$image"/*; do
-  name=${src##*/}; dst="$work/runtime/$name"
-  if [[ $name == chrome-sandbox ]]; then
-    install -m 0700 -- "$src" "$dst"
-    echo "0e92e9a238217c5b66227b9bb34b216839d0bdb0e7e88fdb5d0ed679cf483aae  $dst" | sha256sum -c --status
-    chmod 4755 "$dst"
-  elif [[ -L $src ]]; then ln -s -- "$(readlink -- "$src")" "$dst"
-  else
-    if [[ -d $src ]]; then mkdir -m755 "$dst"; else touch "$dst"; fi
-    readonly_bind "$src" "$dst"
-  fi
-done
+cp -a --reflink=auto -- "$image/." "$work/runtime/"
+find "$work/runtime" -type d -exec chmod a+rx -- {} +
+find "$work/runtime" -type f -exec chmod a+r -- {} +
+[ ! -L "$work/runtime/chrome-sandbox" ]
+echo "0e92e9a238217c5b66227b9bb34b216839d0bdb0e7e88fdb5d0ed679cf483aae  $work/runtime/chrome-sandbox" | sha256sum -c --status
+chown root:root "$work/runtime/chrome-sandbox"
+chmod 4755 "$work/runtime/chrome-sandbox"
 mount -o remount,ro,nodev "$work/runtime"
-readonly_bind "$image/resources/app" "$work/payload"
+readonly_bind "$work/runtime/resources/app" "$work/payload"
 readonly_bind "$www" "$work/www"
 readonly_bind "$pulse" "$work/pulse"
 mount --bind "$output" "$work/evidence"
