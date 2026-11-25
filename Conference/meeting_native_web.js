@@ -588,10 +588,11 @@ class MeetingNativeWeb extends EventEmitter {
       !this.retiring && !this.loggingOut && !this.disposed &&
       contents === window.webContents && originOf(requestingOrigin) === owner.origin &&
       originOf(contents.getURL()) === owner.origin && this.allowedPermissions.has(permission));
+    const pendingPermissions = new Map();
     this.session.setPermissionRequestHandler((contents, permission, callback, details) => {
       if (this.mediaOwner !== owner || owner.retired || this.window !== window ||
           this.retiring || this.loggingOut || this.disposed || contents !== window.webContents ||
-          originOf(contents.getURL()) !== owner.origin ||
+          details.isMainFrame !== true || originOf(contents.getURL()) !== owner.origin ||
           (details.requestingUrl && originOf(details.requestingUrl) !== owner.origin) ||
           (details.securityOrigin && originOf(details.securityOrigin) !== owner.origin) ||
           !['media', 'display-capture', 'speaker-selection'].includes(permission) ||
@@ -600,13 +601,26 @@ class MeetingNativeWeb extends EventEmitter {
       // Do not turn a screen permission into a cached microphone/camera grant.
       if (permission === 'media' && Array.isArray(details.mediaTypes) && !details.mediaTypes.length)
         permission = 'display-capture';
-      Promise.resolve(this.options.requestPermission({ permission, details })).then(allowed => {
+      if (this.allowedPermissions.has(permission)) return callback(true);
+      let pending = pendingPermissions.get(permission);
+      if (!pending) {
+        pending = Promise.resolve().then(() => {
+          if (this.mediaOwner !== owner || owner.retired || this.window !== window || window.isDestroyed() ||
+              this.loggingOut || this.retiring || this.disposed || originOf(contents.getURL()) !== owner.origin)
+            return false;
+          return this.options.requestPermission({ permission, details });
+        }).then(allowed => allowed === true, () => false).finally(() => {
+          if (pendingPermissions.get(permission) === pending) pendingPermissions.delete(permission);
+        });
+        pendingPermissions.set(permission, pending);
+      }
+      pending.then(allowed => {
         allowed = allowed === true && this.mediaOwner === owner && !owner.retired &&
           this.window === window && !window.isDestroyed() && !this.loggingOut && !this.retiring && !this.disposed &&
           originOf(contents.getURL()) === owner.origin;
         if (allowed === true) this.allowedPermissions.add(permission);
         callback(allowed === true);
-      }, () => callback(false));
+      });
     });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {
