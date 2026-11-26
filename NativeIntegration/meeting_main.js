@@ -1207,6 +1207,28 @@ function showSourcePicker({ electron, sources, scope, parent, systemAudio = fals
       });
       window.loadFile(PICKER_FILE).then(async () => {
         if (settled || scope.signal.aborted || window.isDestroyed()) return;
+        // A loaded hidden window can still have a zero-sized viewport. Map only
+        // the blank document first; source names stay hidden until protection is
+        // installed against real layout dimensions, never synthetic bounds.
+        window.show();
+        const laidOut = await contents.executeJavaScript(`new Promise(resolve => {
+          let done = false, frame = null;
+          const finish = ready => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            if (frame !== null) cancelAnimationFrame(frame);
+            window.removeEventListener('resize', check);
+            resolve(ready);
+          };
+          const check = () => { if (innerWidth >= 200 && innerHeight >= 120) finish(true); };
+          const timer = setTimeout(() => finish(false), 5000);
+          window.addEventListener('resize', check);
+          frame = requestAnimationFrame(check);
+          check();
+        })`);
+        if (settled || scope.signal.aborted || window.isDestroyed()) return;
+        if (!laidOut) throw failure('PICKER_LAYOUT_UNAVAILABLE', 'The source picker did not acquire a real viewport');
         if (watermark) {
           // Only this sealed local document receives the same enforced visual policy;
           // do not expose a native dialog or any source names before it is ready.
@@ -1217,7 +1239,10 @@ function showSourcePicker({ electron, sources, scope, parent, systemAudio = fals
           if (!await contents.executeJavaScript(factory + '\n;' + setup))
             throw failure('WATERMARK_ENFORCEMENT_LOST', 'Could not protect the source picker');
         }
-        if (!settled && !scope.signal.aborted && !window.isDestroyed()) { presented = true; window.show(); }
+        if (!settled && !scope.signal.aborted && !window.isDestroyed()) {
+          presented = true;
+          await contents.executeJavaScript('document.body.style.visibility = "visible"');
+        }
       }).catch(error => finish(error));
       if (scope.signal.aborted) aborted();
     } catch (error) { finish(error); }

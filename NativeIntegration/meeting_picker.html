@@ -7,12 +7,13 @@
   <title>Choose a screen or window</title>
   <style>
     :root { color-scheme: light dark; font-family: sans-serif; }
-    body { margin: 0; padding: 24px; box-sizing: border-box; height: 100vh; display: grid; grid-template-rows: auto auto auto minmax(3.5em, 1fr) auto auto; gap: 12px; overflow: auto; }
+    body { visibility: hidden; margin: 0; padding: 24px; box-sizing: border-box; height: 100vh; display: grid; grid-template-rows: auto auto minmax(3.5em, 1fr) auto auto; gap: 12px; overflow: auto; }
     h1 { font-size: 1.35rem; margin: 0; }
     p { margin: 0; line-height: 1.5; }
-    label { font-weight: 600; }
-    select { box-sizing: border-box; width: 100%; min-height: 0; font: inherit; padding: 8px; }
-    option { padding: 8px; white-space: normal; overflow-wrap: anywhere; }
+    legend { font-weight: 600; }
+    fieldset { margin: 0; min-width: 0; min-height: 0; overflow: auto; padding: 8px; }
+    label { display: flex; align-items: start; gap: 8px; padding: 8px; cursor: pointer; }
+    label span { overflow-wrap: anywhere; }
     footer { display: flex; gap: 12px; justify-content: flex-end; }
     button { font: inherit; padding: 9px 16px; }
     :focus-visible { outline: 3px solid #3b82f6; outline-offset: 2px; }
@@ -21,8 +22,10 @@
 <body>
   <h1>Choose a screen or window</h1>
   <p id="scope">Only the source you select will be shared. Nothing is selected automatically.</p>
-  <label for="sources">Available sources</label>
-  <select id="sources" size="8" aria-describedby="status" disabled></select>
+  <fieldset id="sources" aria-describedby="status" disabled>
+    <legend>Available sources</legend>
+    <div id="source-options"></div>
+  </fieldset>
   <p id="status" role="status" aria-live="polite">Loading available sources…</p>
   <footer>
     <button id="cancel" type="button" autofocus>Cancel</button>

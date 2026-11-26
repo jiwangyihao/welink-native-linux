@@ -33,6 +33,7 @@ SUITES = {
     "audio-output": ("verify_audio_output_electron.js", "Actual Chromium media-sink completion/rejection; no capture or cloud meeting claim"),
     "renderer-files": ("verify_renderer_file_receipts.js", "Real shipped file consumers and native providers; synthetic files, no account or SQLite claim"),
     "renderer-recovery": ("verify_meeting_renderer_lifetime.js", "Real media-owner crash/navigation recovery; no cloud meeting or login claim"),
+    "picker-layout": ("verify_picker_layout.js", "Real sandboxed source picker with delayed viewport, protected selection and cancellation; no account or capture"),
     "native-video-x11": ("meeting_render_surface_verify.js", "Actual native per-stream X11 windows and independent pixel observation of generated MediaStreamTracks"),
     "moderation": ("verify_moderation_capabilities.js", "Isolated authenticated CMS/HRTC, native consent and original web consumers; not enterprise admission"),
     "guest-voice": ("verify_guest_voice.js", "Generated speech, real PNR worker and decoded RTP; no real biometrics or live-room quality claim"),
@@ -60,6 +61,7 @@ const scripts = {
   'audio-output': 'verify_audio_output_electron.js',
   'renderer-files': 'verify_renderer_file_receipts.js',
   'renderer-recovery': 'verify_meeting_renderer_lifetime.js',
+  'picker-layout': 'verify_picker_layout.js',
   'native-video-x11': 'meeting_render_surface_verify.js',
   moderation: 'verify_moderation_capabilities.js',
   'guest-voice': 'verify_guest_voice.js',
@@ -337,7 +339,7 @@ def main():
         parser.error("Missing offline host dependencies (nothing is downloaded): " + ", ".join(missing))
     tests = sorted({item[0] for item in selected.values()} | set(COMPANIONS))
     test_sources = {name: source / name for name in tests}
-    for name in ("verify_renderer_file_receipts.js", "verify_meeting_renderer_lifetime.js"):
+    for name in ("verify_renderer_file_receipts.js", "verify_meeting_renderer_lifetime.js", "verify_picker_layout.js"):
         if name in test_sources:
             test_sources[name] = source.parent / "NativeIntegration" / name
     acorn = Path(subprocess.check_output(["node", "-p", "require.resolve('acorn')"],

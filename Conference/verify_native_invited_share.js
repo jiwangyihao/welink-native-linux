@@ -58,7 +58,7 @@ module.exports = async function verifyInvitedShare({ electron, native, origin, o
   }
   async function selectPicker(value) {
     await until(() => value.webContents.executeJavaScript(`!document.getElementById('sources').disabled`), 'populated genuine source list');
-    const source = await value.webContents.executeJavaScript(`(() => {const r=document.getElementById('sources').getBoundingClientRect();return{x:Math.round(r.x+30),y:Math.round(r.y+20)};})()`);
+    const source = await value.webContents.executeJavaScript(`(() => {const r=document.querySelector('#sources input[type="radio"]').getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
     for (const type of ['mouseDown', 'mouseUp']) value.webContents.sendInputEvent({ type, ...source, button: 'left', clickCount: 1 });
     await until(() => value.webContents.executeJavaScript(`!document.getElementById('share').disabled`), 'user source selection enables Share');
     const point = await value.webContents.executeJavaScript(`(() => {
