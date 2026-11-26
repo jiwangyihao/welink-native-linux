@@ -1238,6 +1238,22 @@ def install_renderer_repairs(app):
             source = source.replace(before, after)
         filename.write_text(source, encoding="utf-8")
 
+    # Unknown tenant identity is not same-company evidence. In the original
+    # USG branch, apply the stricter external-sharing policy and require an
+    # explicit allow value; preserve the separate anonymous-sharing decision.
+    # Keep confInfo unchanged so this cannot unlock other same-company actions.
+    patch("plugin/conference/dist/js/hwmService.js", [
+        ('async({Meeting$Share:e,isOtherCorpConf:t})=>{const n=o.a.getStore("isUsgEnable");',
+         'async({Meeting$Share:e,isOtherCorpConf:t})=>{const n=o.a.getStore("isUsgEnable"),'
+         'linuxUnknownTenant=window.require("os").platform()==="linux"&&typeof t!=="boolean";'),
+        ('n&&t?s.default.setShareScreenPermission("0"!==e):',
+         'n&&(t||linuxUnknownTenant)?s.default.setShareScreenPermission('
+         'linuxUnknownTenant?"1"===e:"0"!==e):'),
+        ('window.require("os").platform()==="linux"&&typeof t.isOtherCorpConf!=="boolean"?'
+         'i.default.setShareScreenPermission(false):Object(r.a)(',
+         'Object(r.a)('),
+    ])
+
     for directory in ("pedestal/im/static/js", "plugin/im/dist/im/static/js"):
         patch(f"{directory}/common.js", [
             ('const{rcId:a,rcType:n}=e,r=(0,W.default)(n)?',

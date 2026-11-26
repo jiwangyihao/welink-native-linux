@@ -115,9 +115,16 @@ async function sharingPolicyCases() {
     { label: 'external enterprise denied', relation: true, setting: '0', usg: true, expected: false },
     { label: 'external enterprise allowed', relation: true, setting: '1', usg: true, expected: true },
     { label: 'same enterprise retains original policy', relation: false, setting: '0', usg: true, expected: true },
-    { label: 'unknown enterprise remains denied', setting: '1', usg: true, expected: false },
+    { label: 'unknown enterprise explicitly allowed externally', setting: '1', usg: true, expected: true },
+    { label: 'unknown enterprise external denial retained', setting: '0', usg: true, expected: false },
+    { label: 'unknown enterprise missing policy denied', usg: true, expected: false },
+    { label: 'unknown enterprise unrecognized policy denied', setting: 'unexpected', usg: true, expected: false },
+    { label: 'unknown enterprise non-string policy denied', setting: 1, usg: true, expected: false },
     { label: 'anonymous sharing denial retained', relation: false, setting: '1', usg: false, anonymousDenied: true, expected: false },
-    { label: 'anonymous allowed policy retained', relation: false, setting: '1', usg: false, expected: true }
+    { label: 'anonymous allowed policy retained', relation: false, setting: '1', usg: false, expected: true },
+    { label: 'unknown enterprise anonymous denial retained', setting: '1', usg: false, anonymousDenied: true, expected: false },
+    { label: 'unknown enterprise anonymous policy is independent', setting: '0', usg: false, expected: true },
+    { label: 'non-Linux external denial retained', platform: 'win32', relation: true, setting: '0', usg: true, expected: false }
   ];
   for (const test of cases) {
     const decisions = [], pending = [], values = new Map([['isUsgEnable', test.usg]]);
@@ -139,10 +146,14 @@ async function sharingPolicyCases() {
       },
       sendBroadcast() {}
     };
-    const policy = evaluate(policyExpression, { o: { a: store }, d: logger, Pedestal,
+    const window = { require(module) {
+      assert.equal(module, 'os');
+      return { platform: () => test.platform || 'linux' };
+    } };
+    const policy = evaluate(policyExpression, { o: { a: store }, d: logger, Pedestal, window,
       isNullOrEmpty: value => value == null || value === '', s: { default: api } });
     const consumer = evaluate(consumerExpression, { g: logger, o: { a: value => value }, a: store, Pedestal,
-      window: { require(module) { assert.equal(module, 'os'); return { platform: () => 'linux' }; } },
+      window,
       i: { default: api }, r: { a: params => { const result = policy(params); pending.push(result); return result; },
         c() { throw new Error('Unexpected extended-meeting notification'); } } });
     const detail = { conf_id: 'private-room', displayConferenceId: 'public-room',
@@ -151,6 +162,9 @@ async function sharingPolicyCases() {
     await consumer({ detail });
     await Promise.all(pending);
     assert.deepEqual(decisions, [test.expected], test.label);
+    if (test.relation === undefined)
+      assert.equal(values.get('confInfo').isOtherCorpConf, undefined,
+        'A sharing grant must not fabricate same-company identity for other controls');
   }
   ++groups;
 }
